@@ -1930,3 +1930,8 @@ button:disabled { opacity: .5; cursor: default; }
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
 }
+
+/* Wave 2 Polish: Challenge Modifiers Bar & Live-Ops Touch Targets */
+#w2-modifiers-bar button, #cosmetic-sink-panel button {
+  min-height: 36px;
+}
