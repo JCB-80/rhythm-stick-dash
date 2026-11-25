@@ -12,6 +12,7 @@ const CORE_ASSETS = [
   './js/i18n-ext.js',
   './js/auth-ranking.js',
   './js/audio-synth.js',
+  './js/runner-sprite.js',
   './js/game3d.js',
   './js/app.js',
   './assets/screens/bg_neo_syndicate_stage.png',

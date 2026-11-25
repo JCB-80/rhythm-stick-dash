@@ -71,10 +71,10 @@
       "res_rank_up": "주간 30인 리그 순위 상승!",
       "res_rank_keep": "주간 30인 리그 현재 순위",
       "res_new_best": "신기록 달성!",
-      "song_1_desc": "은하수를 가르는 시그니처 신스웨이브 질주 트랙",
-      "song_2_desc": "묵직한 사이버 베이스와 네온 비트의 공명",
-      "song_3_desc": "고요한 야경을 깨우는 고속 브레이크비트 질주",
-      "song_4_desc": "한계 속도에 도전하는 하이퍼 오버드라이브 클라이맥스"
+      "song_1_desc": "트렌디 K-POP 하이퍼 슬랩하우스 & 보컬찹 드롭 앤섬",
+      "song_2_desc": "감각적인 최신 저지클럽(Jersey Club) & UK 개러지 그루브",
+      "song_3_desc": "세련된 바이럴 리퀴드 드럼앤베이스(Liquid DnB) 질주곡",
+      "song_4_desc": "강렬한 808 카우벨 드리프트 퐁크(Drift Phonk) 오버드라이브"
     },
     "en": {
       "subtitle": "NEO SYNDICATE SYMPHONY RUNNER",

@@ -2,3 +2,12 @@
 Thumbs.db
 node_modules/
 *.log
+.gradle-cache/
+.gradle-dist/
+android-build/
+store/*.jks
+store/*.keystore
+store/keystore-info.txt
+store/*.aab
+store/*.apk
+
