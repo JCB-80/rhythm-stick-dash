@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>리듬 스틱 대쉬 — Rhythm Stick Dash</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <!-- Global Ambient Stage Background -->
+  <div id="global-bg" class="global-bg"></div>
+  <div class="global-vignette"></div>
+
+  <!-- Global Top-Right Language Switcher (Always Accessible Across Login / Lobby / Settings) -->
+  <div id="lang-switcher-wrap" class="lang-switcher-wrap">
+    <button id="btn-lang-toggle" class="lang-pill-btn" type="button" aria-label="Language Switcher">
+      <img src="./assets/sprites_i18n_frames/icon_lang_globe.png" alt="Language" class="lang-globe-icon" />
+      <span id="current-lang-label" data-i18n="lang_name">한국어</span>
+      <span class="lang-caret">▾</span>
+    </button>
+    <div id="lang-dropdown" class="lang-dropdown hidden">
+      <button type="button" class="lang-option" data-lang="ko">한국어 (KO)</button>
+      <button type="button" class="lang-option" data-lang="en">English (EN)</button>
+      <button type="button" class="lang-option" data-lang="ja">日本語 (JA)</button>
+      <button type="button" class="lang-option" data-lang="zh-TW">繁體中文 (ZH-TW)</button>
+      <button type="button" class="lang-option" data-lang="es">Español (ES)</button>
+    </div>
+  </div>
+
+  <!-- Main Scene Viewport -->
+  <main id="app-root" class="app-root">
+    <!-- ==================== SCENE 1: 1-TOUCH SOCIAL LOGIN (NO ID/PW INPUTS!) ==================== -->
+    <section id="scene-login" class="scene active">
+      <div class="login-layout">
+        <!-- Left Title & 5 Social Login Panel -->
+        <div class="login-left-col">
+          <div class="brand-header">
+            <div class="brand-kicker" data-i18n="subtitle">네오 신디케이트 심포니 러너</div>
+            <h1 class="brand-title" data-i18n="game_title">리듬 스틱 대쉬</h1>
+          </div>
+
+          <div class="login-glass-box">
+            <p class="login-caption" data-i18n="tap_to_connect">원터치 소셜 로그인 · 별도 가입 없이 1초 즉시 시작</p>
+            <!-- Dynamic container sorted automatically by language (KO vs Global) -->
+            <div id="social-buttons-list" class="social-buttons-list"></div>
+            <div class="login-version-bar">
+              <span class="eq-bars"><i></i><i></i><i></i><i></i><i></i></span>
+              <span>v5.0 NEO SYNDICATE</span>
+              <span class="online-dot">● LIVE 30-GROUP</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Character Showcase (Luna) -->
+        <div class="login-right-col">
+          <div class="hero-showcase-card">
+            <img src="./assets/characters/char_luna.png" alt="Luna" class="login-luna-art" />
+            <div class="hero-showcase-glow"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== SCENE 2: CHARACTER SELECT ==================== -->
+    <section id="scene-character" class="scene">
+      <header class="top-nav-bar">
+        <button id="btn-char-logout" type="button" class="frame-btn secondary-frame-btn nav-sm-btn">
+          <span data-i18n="logout">계정 전환</span>
+        </button>
+        <h2 class="scene-header-title" data-i18n="select_hero">러너 선택</h2>
+        <div class="user-profile-chip">
+          <span id="char-user-badge" class="provider-mini-badge">G</span>
+          <span id="char-user-nick">Runner</span>
+          <span class="coin-pill">🪙 <b id="char-user-coins">1,000</b></span>
+        </div>
+      </header>
+
+      <div id="character-cards-grid" class="character-cards-grid">
+        <!-- Populated dynamically with Kai, Luna, Aria -->
+      </div>
+
+      <footer class="character-bottom-bar">
+        <div id="selected-char-quote" class="char-quote-banner"></div>
+        <button id="btn-confirm-character" type="button" class="frame-btn primary-frame-btn cta-lg-btn">
+          <span data-i18n="select_btn">러너 확정</span>
+        </button>
+      </footer>
+    </section>
+
+    <!-- ==================== SCENE 3: SONG & DIFFICULTY LOBBY ==================== -->
+    <section id="scene-lobby" class="scene">
+      <header class="top-nav-bar lobby-nav">
+        <div class="nav-left-group">
+          <button id="btn-lobby-back" type="button" class="frame-btn secondary-frame-btn nav-sm-btn">
+            <span>◀ <span data-i18n="back">뒤로</span></span>
+          </button>
+          <button id="btn-open-settings" type="button" class="frame-btn secondary-frame-btn nav-sm-btn">
+            <span>⚙ <span data-i18n="options">설정</span></span>
+          </button>
+          <button id="btn-open-vip" type="button" class="frame-btn reward-frame-btn nav-sm-btn">
+            <span>👑 <span data-i18n="shop_vip">VIP 패스 (광고 제거)</span></span>
+          </button>
+        </div>
+
+        <div class="nav-right-group">
+          <button id="btn-open-ranking" type="button" class="frame-btn primary-frame-btn ranking-trigger-btn">
+            <span>🏆 <span data-i18n="ranking_weekly">주간 30인 리그</span> <b id="lobby-my-rank-pill">#--</b></span>
+          </button>
+          <div id="lobby-runner-chip" class="runner-mini-chip" title="Change Runner">
+            <img id="lobby-runner-avatar" src="./assets/characters/char_luna.png" alt="Runner" />
+            <div>
+              <div id="lobby-runner-name" class="runner-mini-name">LUNA</div>
+              <div class="runner-mini-coins">🪙 <span id="lobby-user-coins">1,000</span></div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <div class="lobby-main-grid">
+        <!-- Left Track List + Custom MP3 Upload -->
+        <div class="lobby-song-list-col">
+          <div class="lobby-brand-mini">
+            <span class="crown-glow">♛</span>
+            <span data-i18n="game_title">리듬 스틱 대쉬</span>
+            <small data-i18n="lobby_subtitle">트랙 & 난이도 선택</small>
+          </div>
+
+          <div id="song-list-container" class="song-list-container"></div>
+
+          <label for="mp3-file-input" class="frame-btn secondary-frame-btn upload-mp3-btn">
+            <span>🎵 <span data-i18n="upload_mp3">내 MP3 곡 불러오기</span></span>
+          </label>
+          <input id="mp3-file-input" type="file" accept="audio/*" class="hidden" />
+        </div>
+
+        <!-- Right Selected Song Hologram Deck & Difficulty & START RUN -->
+        <div class="lobby-stage-deck-col">
+          <div class="song-hologram-Showcase">
+            <div class="turntable-disc"></div>
+            <div id="song-cover-card" class="song-cover-card">
+              <div class="equalizer-top-strip">
+                <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+              </div>
+              <div id="song-cover-visual" class="song-cover-visual"></div>
+              <div class="song-meta-panel">
+                <h3 id="selected-song-title" class="selected-song-title">GALAXY CHASE</h3>
+                <p id="selected-song-desc" class="selected-song-desc"></p>
+                <div class="song-stats-row">
+                  <div><small data-i18n="bpm_label">BPM</small><b id="selected-song-bpm">132</b></div>
+                  <div><small data-i18n="length_label">길이</small><b id="selected-song-len">01:15</b></div>
+                  <div><small data-i18n="composer_label">아티스트</small><b id="selected-song-artist">NEO SYNDICATE</b></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- High Score Emblem Box -->
+            <div class="highscore-floating-box">
+              <img id="lobby-best-rank-img" src="./assets/sprites_transparent/rank_s_plus.png" alt="Rank" class="lobby-rank-emblem" />
+              <div>
+                <div class="hs-label" data-i18n="high_score">최고 기록</div>
+                <div id="lobby-high-score" class="hs-value">0</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Difficulty Selector + START RUN CTA -->
+          <div class="lobby-bottom-controls">
+            <div id="difficulty-tabs" class="difficulty-tabs">
+              <button type="button" class="diff-pill easy" data-diff="EASY">
+                <span data-i18n="diff_easy">EASY</span>
+                <small>★☆☆☆</small>
+              </button>
+              <button type="button" class="diff-pill normal active" data-diff="NORMAL">
+                <span data-i18n="diff_normal">NORMAL</span>
+                <small>★★☆☆</small>
+              </button>
+              <button type="button" class="diff-pill hard" data-diff="HARD">
+                <span data-i18n="diff_hard">HARD</span>
+                <small>★★★☆</small>
+              </button>
+              <button type="button" class="diff-pill extreme" data-diff="EXTREME">
+                <span data-i18n="diff_extreme">EXTREME</span>
+                <small>★★★★</small>
+              </button>
+            </div>
+
+            <button id="btn-start-run" type="button" class="start-run-neon-btn">
+              <span class="start-brackets">»</span>
+              <span data-i18n="start_run">질주 시작</span>
+              <span class="start-brackets">«</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== SCENE 4: 3D IN-GAME PLAY ==================== -->
+    <section id="scene-game" class="scene">
+      <div id="three-canvas-container" class="three-canvas-container"></div>
+      <div id="fever-screen-fx" class="fever-screen-fx hidden"></div>
+
+      <!-- In-Game Top HUD -->
+      <div class="ingame-top-hud">
+        <div class="hud-left-cluster">
+          <button id="btn-game-pause" type="button" class="hud-pause-btn" aria-label="Pause">❚❚</button>
+          <div id="hud-diff-badge" class="hud-diff-badge">NORMAL</div>
+          <div class="hud-combo-box">
+            <small data-i18n="hud_combo">COMBO</small>
+            <strong id="hud-combo-num">0</strong>
+          </div>
+        </div>
+
+        <div class="hud-center-cluster">
+          <div class="fever-gauge-shell">
+            <div id="hud-fever-fill" class="fever-gauge-fill"></div>
+            <span class="fever-crown-icon">♛</span>
+          </div>
+          <div id="hud-fever-banner" class="hud-fever-banner hidden" data-i18n="hud_fever_max">MAX FEVER OVERDRIVE x4!</div>
+          <div class="hp-bar-shell">
+            <span class="hp-label">HP</span>
+            <div class="hp-bar-track"><div id="hud-hp-fill" class="hp-bar-fill"></div></div>
+            <span id="hud-route-mult" class="hud-route-mult">1.0x</span>
+          </div>
+        </div>
+
+        <div class="hud-right-cluster">
+          <div class="hud-score-box">
+            <small id="hud-song-name">Galaxy Chase</small>
+            <strong id="hud-score-num">0</strong>
+            <div class="song-progress-mini"><div id="hud-time-fill"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Left & Right Live Ghost Rivals (30-Group Live Rivals) -->
+      <div id="hud-ghost-left" class="hud-ghost-stack left"></div>
+      <div id="hud-ghost-right" class="hud-ghost-stack right"></div>
+
+      <!-- Real-Time Y-Branch Neon Route Signs (NORMAL / HARD / EXTREME) -->
+      <div id="branch-choice-overlay" class="branch-choice-overlay hidden">
+        <div id="branch-card-std" class="branch-sign-card std active">
+          <span class="branch-title" data-i18n="branch_std">일반 루트 1x</span>
+          <strong>1x</strong>
+        </div>
+        <div class="branch-center-prompt" data-i18n="branch_alert">갈림길 접근! 차선 선택!</div>
+        <div id="branch-card-rush" class="branch-sign-card rush">
+          <span class="branch-title" data-i18n="branch_rush">러시 루트 2x</span>
+          <strong id="branch-rush-mult-label">2x</strong>
+        </div>
+      </div>
+
+      <!-- Judgment & Stick Slash Sprite Popups -->
+      <div class="hud-center-fx-stage">
+        <img id="vfx-slash-img" src="./assets/sprites_transparent/vfx_stick_slash.png" alt="" class="vfx-slash-popup hidden" />
+        <img id="judge-popup-img" src="./assets/sprites_transparent/judge_perfect.png" alt="" class="judge-sprite-popup hidden" />
+        <img id="fever-popup-img" src="./assets/sprites_transparent/judge_fever.png" alt="" class="fever-sprite-popup hidden" />
+      </div>
+
+      <!-- Bottom Touch / Click Action Controls (Transparent PNG Sprites) -->
+      <div class="ingame-bottom-controls">
+        <div class="lane-btn-pair">
+          <button id="btn-ctrl-left" type="button" class="sprite-ctrl-btn" aria-label="Move Left">
+            <img src="./assets/sprites_transparent/btn_left.png" alt="Left" />
+            <kbd>A / ◀</kbd>
+          </button>
+          <button id="btn-ctrl-right" type="button" class="sprite-ctrl-btn" aria-label="Move Right">
+            <img src="./assets/sprites_transparent/btn_right.png" alt="Right" />
+            <kbd>D / ▶</kbd>
+          </button>
+        </div>
+
+        <div class="ctrl-hint-bar" data-i18n="ctrl_hint"></div>
+
+        <div class="action-btn-pair">
+          <button id="btn-ctrl-tap" type="button" class="sprite-ctrl-btn action-btn" aria-label="Tap Note">
+            <img src="./assets/sprites_transparent/btn_tap.png" alt="Tap" />
+            <kbd>SPACE / J</kbd>
+          </button>
+          <button id="btn-ctrl-swipe" type="button" class="sprite-ctrl-btn action-btn" aria-label="Swipe Note">
+            <img src="./assets/sprites_transparent/btn_swipe.png" alt="Swipe" />
+            <kbd>SHIFT / K</kbd>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== SCENE 5: STAGE CLEAR RESULT & AUTO RANKING ==================== -->
+    <section id="scene-result" class="scene">
+      <div class="result-top-banner">
+        <div class="neon-line-bar"></div>
+        <h2 class="result-title-glow" data-i18n="stage_clear">스테이지 클리어!</h2>
+        <div class="neon-line-bar"></div>
+      </div>
+
+      <div class="result-main-layout">
+        <div class="result-hero-col">
+          <div class="result-hero-frame">
+            <img id="result-char-img" src="./assets/characters/char_luna.png" alt="Runner" />
+          </div>
+        </div>
+
+        <div class="result-stats-col">
+          <div class="result-rank-header">
+            <img id="result-rank-img" src="./assets/sprites_transparent/rank_s_plus.png" alt="Rank Emblem" class="result-rank-emblem" />
+            <div class="result-song-summary">
+              <span id="result-new-best" class="new-best-pill hidden" data-i18n="res_new_best">신기록 달성!</span>
+              <h3 id="result-song-title">Galaxy Chase</h3>
+              <p id="result-diff-runner">NORMAL · LUNA</p>
+            </div>
+          </div>
+
+          <div class="result-scoreboard-card">
+            <div class="score-headline-row">
+              <div>
+                <small data-i18n="res_score">최종 점수</small>
+                <strong id="result-score-val" class="gold-num">0</strong>
+              </div>
+              <div>
+                <small data-i18n="res_max_combo">최대 콤보</small>
+                <strong id="result-combo-val" class="cyan-num">0</strong>
+              </div>
+            </div>
+
+            <div class="judge-counts-row">
+              <span class="j-perf">PERFECT: <b id="res-cnt-perfect">0</b></span>
+              <span class="j-great">GREAT: <b id="res-cnt-great">0</b></span>
+              <span class="j-miss">MISS: <b id="res-cnt-miss">0</b></span>
+            </div>
+
+            <!-- Auto Weekly 30-Group Rank Promotion Banner -->
+            <div id="result-rank-promo-box" class="result-rank-promo-box">
+              <span id="result-rank-promo-label" data-i18n="res_rank_up">주간 30인 리그 순위 상승!</span>
+              <strong id="result-rank-delta">#20 → #5 (▲15)</strong>
+            </div>
+
+            <div class="rewards-section">
+              <div class="rewards-divider"><span data-i18n="res_rewards">클리어 보상 획득</span></div>
+              <div class="reward-items-row">
+                <div class="reward-tile">💠 <span>EXP +120</span></div>
+                <div class="reward-tile">⚡ <span>BEAT CORE +3</span></div>
+                <div class="reward-tile">🪙 <span id="result-coins-earned">+250</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="result-actions-row">
+            <button id="btn-result-retry" type="button" class="frame-btn secondary-frame-btn result-cta-btn">
+              <span>↻ <span data-i18n="btn_retry">다시 도전</span></span>
+            </button>
+            <button id="btn-result-ranking" type="button" class="frame-btn reward-frame-btn result-cta-btn">
+              <span>🏆 <span data-i18n="ranking_weekly">주간 30인 리그</span></span>
+            </button>
+            <button id="btn-result-lobby" type="button" class="frame-btn primary-frame-btn result-cta-btn">
+              <span><span data-i18n="btn_lobby">로비로 이동</span> »</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ==================== MODAL 1: 30-PLAYER WEEKLY INTEGRATED LEADERBOARD ==================== -->
+  <div id="modal-ranking" class="modal-backdrop hidden">
+    <div class="modal-panel ranking-modal-panel">
+      <div class="modal-header">
+        <div>
+          <h3 data-i18n="ranking_weekly">주간 30인 리그</h3>
+          <p class="modal-sub" data-i18n="ranking_sub">4대 소셜 통합 30인 주간 그룹 리더보드</p>
+        </div>
+        <button type="button" class="modal-close-x" data-close-modal="modal-ranking">✕</button>
+      </div>
+
+      <div class="ranking-group-bar">
+        <span id="ranking-group-id">NEO-GROUP #07</span>
+        <span class="promo-tip" data-i18n="ranking_promo_tip">상위 10위 이내 달성 시 주간 다이아 리그 승급!</span>
+        <button id="btn-claim-weekly" type="button" class="frame-btn reward-frame-btn sm-claim-btn">
+          <span>🎁 <span data-i18n="btn_claim">보상 받기</span></span>
+        </button>
+      </div>
+
+      <div class="ranking-table-wrap">
+        <table class="ranking-table">
+          <thead>
+            <tr>
+              <th data-i18n="rank_col_pos">순위</th>
+              <th data-i18n="rank_col_player">러너</th>
+              <th data-i18n="rank_col_score">주간 총점</th>
+            </tr>
+          </thead>
+          <tbody id="ranking-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL 2: VIP PASS & REWARD SHOP ==================== -->
+  <div id="modal-vip" class="modal-backdrop hidden">
+    <div class="modal-panel sm-modal-panel">
+      <div class="modal-header">
+        <h3 data-i18n="shop_vip">VIP 패스 (광고 제거)</h3>
+        <button type="button" class="modal-close-x" data-close-modal="modal-vip">✕</button>
+      </div>
+      <p class="vip-body-text" data-i18n="vip_desc"></p>
+      <div class="vip-actions-stack">
+        <button id="btn-activate-vip" type="button" class="frame-btn primary-frame-btn cta-lg-btn">
+          <span id="vip-btn-label" data-i18n="shop_vip">VIP 패스 (광고 제거)</span>
+        </button>
+        <button id="btn-free-ad-coins" type="button" class="frame-btn reward-frame-btn cta-lg-btn">
+          <span>🎬 <span data-i18n="ad_reward_btn">보너스 +300 코인 무료 획득</span></span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL 3: SETTINGS & PAUSE ==================== -->
+  <div id="modal-settings" class="modal-backdrop hidden">
+    <div class="modal-panel sm-modal-panel">
+      <div class="modal-header">
+        <h3 id="settings-modal-title" data-i18n="settings_title">사운드 & 플레이 설정</h3>
+        <button type="button" class="modal-close-x" data-close-modal="modal-settings">✕</button>
+      </div>
+
+      <div class="settings-form">
+        <label class="setting-row">
+          <span data-i18n="bgm_vol">배경음악 볼륨</span>
+          <input id="input-bgm-vol" type="range" min="0" max="100" value="75" />
+        </label>
+        <label class="setting-row">
+          <span data-i18n="sfx_vol">타격 효과음 볼륨</span>
+          <input id="input-sfx-vol" type="range" min="0" max="100" value="85" />
+        </label>
+        <label class="setting-row checkbox-row">
+          <span data-i18n="auto_fever">피버 게이지 완충 시 자동 발동</span>
+          <input id="input-auto-fever" type="checkbox" checked />
+        </label>
+        <label class="setting-row">
+          <span data-i18n="nickname_label">러너 닉네임</span>
+          <input id="input-nickname" type="text" maxlength="16" class="cyber-text-input" />
+        </label>
+      </div>
+
+      <div id="pause-extra-actions" class="pause-extra-actions hidden">
+        <button id="btn-pause-resume" type="button" class="frame-btn primary-frame-btn nav-sm-btn">
+          <span data-i18n="resume_btn">계속 달리기</span>
+        </button>
+        <button id="btn-pause-retry" type="button" class="frame-btn secondary-frame-btn nav-sm-btn">
+          <span data-i18n="btn_retry">다시 도전</span>
+        </button>
+        <button id="btn-pause-lobby" type="button" class="frame-btn secondary-frame-btn nav-sm-btn">
+          <span data-i18n="btn_lobby">로비로 이동</span>
+        </button>
+      </div>
+
+      <div id="settings-normal-actions" class="pause-extra-actions">
+        <button id="btn-save-settings" type="button" class="frame-btn primary-frame-btn nav-sm-btn">
+          <span data-i18n="save_btn">저장 완료</span>
+        </button>
+        <button type="button" class="frame-btn secondary-frame-btn nav-sm-btn" data-close-modal="modal-settings">
+          <span data-i18n="close_btn">닫기</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast & Auth Loading Overlay -->
+  <div id="auth-loading-overlay" class="auth-loading-overlay hidden">
+    <div class="neon-spinner"></div>
+    <p data-i18n="auth_connecting">네오 신디케이트 인증 연결 중...</p>
+  </div>
+  <div id="toast-banner" class="toast-banner hidden"></div>
+
+  <!-- External & Local Scripts (Pure HTML/CSS/Vanilla JS + Three.js CDN + i18n) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="./locales/i18n.js"></script>
+  <script src="./js/i18n-ext.js"></script>
+  <script src="./js/auth-ranking.js"></script>
+  <script src="./js/audio-synth.js"></script>
+  <script src="./js/game3d.js"></script>
+  <script src="./js/app.js"></script>
+</body>
+</html>
