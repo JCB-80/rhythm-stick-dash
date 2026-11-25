@@ -1,133 +1,108 @@
-// AuthService (Local Mock + Cloud Adapter Stub) & 30-Player Unified Social Ranking Engine
+// Local prototype account, atomic stage rewards, weekly seasons and earned rewards.
 (function () {
-  const USER_STORAGE_KEY = 'rsd_user_session_v5';
-  const SCORES_STORAGE_KEY = 'rsd_song_scores_v5';
-  const RIVALS_STORAGE_KEY = 'rsd_weekly_group30_v5';
-
-  function getIsoWeekKey() {
-    const now = new Date();
-    const d = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
-    const dayNum = d.getUTCDay() || 7;
-    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-    const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
-    return `${d.getUTCFullYear()}_W${String(weekNo).padStart(2, '0')}`;
-  }
-
-  function getWeeklyClaimKey() {
-    return `rsd_weekly_claimed_${getIsoWeekKey()}`;
-  }
-
-  // Cloud configuration stub: drop Supabase / Firebase credentials here for production cross-social sync
-  const CLOUD_CONFIG = {
-    enabled: false,
-    supabaseUrl: '',
-    supabaseAnonKey: '',
-    groupId: 'NEO-SYNDICATE-G07'
-  };
-
+  const ROOT_KEY = 'rsd_profile_v6';
+  const store = window.GameStorage;
+  const object = v => v !== null && typeof v === 'object' && !Array.isArray(v);
+  const number = (v, fallback = 0, max = 1e12) => typeof v === 'number' && Number.isFinite(v) ? Math.max(0, Math.min(max, v)) : fallback;
   const PROVIDER_META = {
-    kakao:  { badge: 'K', label: 'Kakao',  css: 'kakao' },
-    naver:  { badge: 'N', label: 'NAVER',  css: 'naver' },
-    google: { badge: 'G', label: 'Google', css: 'google' },
-    apple:  { badge: 'A', label: 'Apple',  css: 'apple' },
-    guest:  { badge: 'P', label: 'Guest',  css: 'guest' }
+    kakao: { badge: 'K', label: 'Kakao' }, naver: { badge: 'N', label: 'NAVER' },
+    google: { badge: 'G', label: 'Google' }, apple: { badge: 'A', label: 'Apple' }, guest: { badge: 'P', label: 'Guest' }
   };
-
-  // ==================== 1. AUTH ADAPTER & SERVICE ====================
+  const CLOUD_CONFIG = { enabled: false, groupId: 'NEO-SYNDICATE-G07' };
+  const OFFICIAL_SONGS = ['galaxy_chase', 'neon_pulse', 'silent_city', 'cyber_overdrive'];
+  const DIFFICULTIES = ['EASY', 'NORMAL', 'HARD', 'EXTREME'];
+  function hash(text) { let n = 2166136261; for (const ch of text) n = Math.imul(n ^ ch.charCodeAt(0), 16777619); return n >>> 0; }
+  // Season boundaries are UTC, identical in every locale.
+  function getIsoWeekKey(date = new Date()) {
+    const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+    d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+    const start = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    return `${d.getUTCFullYear()}_W${String(Math.ceil(((d - start) / 86400000 + 1) / 7)).padStart(2, '0')}`;
+  }
+  function cleanUser(raw) {
+    if (!object(raw) || typeof raw.uid !== 'string' || !raw.uid) return null;
+    const settings = object(raw.settings) ? raw.settings : {};
+    return {
+      uid: raw.uid.slice(0, 100), nickname: typeof raw.nickname === 'string' ? raw.nickname.slice(0, 16) : 'Runner',
+      provider: Object.hasOwn(PROVIDER_META, raw.provider) ? raw.provider : 'guest',
+      coins: Math.floor(number(raw.coins, 1200)), selectedChar: ['kai', 'luna', 'aria'].includes(raw.selectedChar) ? raw.selectedChar : 'luna',
+      // VIP is a free local demo, never a verified purchase entitlement.
+      vip: raw.vip === true, loggedOut: !!raw.loggedOut, createdAt: raw.createdAt,
+      xp: Math.floor(number(raw.xp)), cores: Math.floor(number(raw.cores)), league: Math.floor(number(raw.league, 0, 2)),
+      settings: { bgmVol: number(settings.bgmVol, .75, 1), sfxVol: number(settings.sfxVol, .85, 1), autoFever: settings.autoFever !== false,
+        audioOffset: typeof settings.audioOffset === 'number' && Number.isFinite(settings.audioOffset) ? Math.max(-.25, Math.min(.25, settings.audioOffset)) : 0 }
+    };
+  }
+  function cleanScores(raw) {
+    const out = Object.create(null);
+    if (!object(raw)) return out;
+    for (const [key, value] of Object.entries(raw)) {
+      if (!/^[\w-]+__(EASY|NORMAL|HARD|EXTREME)$/.test(key) || !object(value) || !Number.isFinite(value.score) || value.score < 0) continue;
+      out[key] = { score: number(value.score), maxCombo: Math.floor(number(value.maxCombo)), rank: ['S+', 'A', 'B', 'C', 'D'].includes(value.rank) ? value.rank : 'D', version: 2 };
+    }
+    return out;
+  }
+  function readRoot() {
+    const raw = store.read(ROOT_KEY, null);
+    const root = object(raw) ? raw : {
+      user: store.read('rsd_user_session_v5', null), scores: store.read('rsd_song_scores_v5', {}), weeks: {}, sessions: []
+    };
+    root.user = cleanUser(root.user); root.scores = cleanScores(root.scores);
+    root.weeks = object(root.weeks) ? root.weeks : {};
+    for (const key of Object.keys(root.weeks)) {
+      const w = root.weeks[key];
+      if (!/^\d{4}_W\d{2}$/.test(key) || !object(w)) { delete root.weeks[key]; continue; }
+      w.scores = cleanScores(w.scores); w.plays = Math.floor(number(w.plays)); w.claimed = w.claimed === true; w.settled = w.settled === true;
+    }
+    root.sessions = Array.isArray(root.sessions) ? root.sessions.filter(s => typeof s === 'string').slice(-128) : [];
+    return root;
+  }
+  function save(root) { store.write(ROOT_KEY, root); }
+  function total(scores) {
+    const max = Object.create(null);
+    for (const [key, v] of Object.entries(scores)) {
+      const id = key.split('__')[0];
+      if (OFFICIAL_SONGS.includes(id) && v.version === 2) max[id] = Math.max(max[id] || 0, v.score);
+    }
+    return Object.values(max).reduce((a, b) => a + b, 0);
+  }
+  function rankFor(week, score) { return 1 + createSeededRivals(week).filter(r => r.score >= score).length; }
+  function season(root) {
+    const key = getIsoWeekKey();
+    for (const [week, w] of Object.entries(root.weeks).sort(([a], [b]) => a.localeCompare(b))) {
+      if (week < key && !w.settled && root.user) {
+        w.finalRank = rankFor(week, total(w.scores));
+        if (w.plays > 0) root.user.league = Math.max(0, Math.min(2, root.user.league + (w.finalRank <= 10 ? 1 : w.finalRank > 20 ? -1 : 0)));
+        w.settled = true;
+      }
+    }
+    if (!root.weeks[key]) root.weeks[key] = { scores: {}, plays: 0, settled: false, claimed: false };
+    // Keep 12 seasons; already settled older data cannot inflate the current week.
+    Object.keys(root.weeks).sort().slice(0, -12).forEach(k => delete root.weeks[k]);
+    return root.weeks[key];
+  }
+  function current() { const root = readRoot(); season(root); save(root); return root; }
   const LocalAuthAdapter = {
     async signIn(provider) {
       await new Promise(resolve => setTimeout(resolve, 400));
-      let saved = null;
-      try {
-        saved = JSON.parse(localStorage.getItem(USER_STORAGE_KEY) || 'null');
-      } catch (_) {}
-
-      if (saved && saved.uid && saved.provider === provider) {
-        return saved;
-      }
-
-      const randId = Math.random().toString(36).substring(2, 8).toUpperCase();
-      const numTag = Math.floor(100 + Math.random() * 899);
-      const prefixMap = {
-        kakao: 'BeatK_',
-        naver: 'NeoN_',
-        google: 'CyberG_',
-        apple: 'SonicA_',
-        guest: 'Runner_'
-      };
-
-      const user = {
-        uid: (saved && saved.uid) ? saved.uid : ('uid_' + randId + Date.now().toString(36).slice(-4)),
-        nickname: (saved && saved.nickname) ? saved.nickname : ((prefixMap[provider] || 'Runner_') + numTag),
-        provider: provider,
-        provider_badge: (PROVIDER_META[provider] || PROVIDER_META.guest).badge,
-        coins: (saved && typeof saved.coins === 'number') ? saved.coins : 1200,
-        vip: !!(saved && saved.vip),
-        selectedChar: (saved && saved.selectedChar) || 'luna',
-        settings: Object.assign({
-          bgmVol: 0.75,
-          sfxVol: 0.85,
-          autoFever: true
-        }, saved && saved.settings ? saved.settings : {}),
-        createdAt: (saved && saved.createdAt) || new Date().toISOString()
-      };
-
-      localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
-      return user;
+      const root = readRoot();
+      root.user = cleanUser({ uid: `uid_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`, nickname: `Runner_${Math.floor(100 + Math.random() * 900)}`, coins: 1200, ...(root.user || {}), provider, loggedOut: false });
+      season(root); save(root); return root.user;
     }
   };
-
-  const CloudAuthAdapter = {
-    async signIn(provider) {
-      // Production hook for Supabase / Firebase OAuth unified UID linking
-      return LocalAuthAdapter.signIn(provider);
-    }
-  };
-
+  const CloudAuthAdapter = { async signIn() { throw new Error('Cloud authentication is not configured'); } };
   window.AuthService = {
     PROVIDER_META,
-    async signIn(provider) {
-      const adapter = CLOUD_CONFIG.enabled ? CloudAuthAdapter : LocalAuthAdapter;
-      return adapter.signIn(provider);
-    },
-    getCurrentUser() {
-      try {
-        return JSON.parse(localStorage.getItem(USER_STORAGE_KEY) || 'null');
-      } catch (_) {
-        return null;
-      }
-    },
+    signIn(provider) { return (CLOUD_CONFIG.enabled ? CloudAuthAdapter : LocalAuthAdapter).signIn(provider); },
+    getCurrentUser() { return current().user; },
     updateUser(patch) {
-      const curr = this.getCurrentUser();
-      if (!curr) return null;
-      const next = Object.assign({}, curr, patch);
-      if (patch.settings) {
-        next.settings = Object.assign({}, curr.settings || {}, patch.settings);
-      }
-      localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(next));
-      return next;
+      const root = current(); if (!root.user) return null;
+      root.user = cleanUser({ ...root.user, ...patch, settings: { ...root.user.settings, ...(object(patch.settings) ? patch.settings : {}) } });
+      save(root); return root.user;
     },
-    signOut() {
-      // Keeps high scores & UID history available, clears active auto-enter flag if switching provider
-      const curr = this.getCurrentUser();
-      if (curr) {
-        curr.loggedOut = true;
-        localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(curr));
-      }
-    }
+    signOut() { this.updateUser({ loggedOut: true }); }
   };
-
-  // ==================== 2. UNIFIED 30-PLAYER SOCIAL RANKING ENGINE ====================
-  const CloudRankingAdapter = {
-    async syncScore(payload) {
-      // Unified schema: { uid, nickname, provider_badge, score, group_id, updated_at }
-      if (!CLOUD_CONFIG.enabled || !CLOUD_CONFIG.supabaseUrl) return payload;
-      return payload;
-    }
-  };
-
-  function createSeededRivals() {
+  function createSeededRivals(week = getIsoWeekKey()) {
     const names = [
       ['NeonValkyrie', 'google', 984200],
       ['서울비트장인', 'kakao', 942500],
@@ -165,162 +140,74 @@
       nickname,
       provider,
       provider_badge: PROVIDER_META[provider].badge,
-      score: baseScore + Math.floor(Math.random() * 4200),
+      score: baseScore + hash(week + nickname) % 4200,
       group_id: CLOUD_CONFIG.groupId,
       updated_at: new Date().toISOString(),
       isAI: true
     }));
   }
 
+
   window.RankingEngine = {
     groupId: CLOUD_CONFIG.groupId,
-
-    getRivals() {
-      let rivals = null;
-      try {
-        rivals = JSON.parse(localStorage.getItem(RIVALS_STORAGE_KEY) || 'null');
-      } catch (_) {}
-      if (!Array.isArray(rivals) || rivals.length !== 29) {
-        rivals = createSeededRivals();
-        localStorage.setItem(RIVALS_STORAGE_KEY, JSON.stringify(rivals));
+    getRivals() { return createSeededRivals(); },
+    getAllSongScores() { return current().scores; },
+    getSongBest(songId, diff) { const v = this.getAllSongScores()[`${songId}__${diff}`]; return v && v.version === 2 ? v : { score: 0, maxCombo: 0, rank: 'D' }; },
+    getMyWeeklyTotalScore() { return total(season(current()).scores); },
+    getGroupLeaderboard(songId, diff) {
+      const root = current(), user = root.user || { uid: 'guest_local', nickname: 'Runner', provider: 'guest' };
+      const week = season(root), songMode = OFFICIAL_SONGS.includes(songId) && DIFFICULTIES.includes(diff);
+      const score = songMode ? (week.scores[`${songId}__${diff}`]?.score || 0) : total(week.scores);
+      const rivals = this.getRivals().map(r => ({ ...r, score: songMode ? Math.round(r.score * ({ EASY: .22, NORMAL: .40, HARD: .60, EXTREME: .85 }[diff]) * (.9 + hash(songId + r.uid) % 20 / 100)) : r.score }));
+      return [...rivals, { uid: user.uid, nickname: user.nickname, provider: user.provider, provider_badge: PROVIDER_META[user.provider].badge, score, isMe: true }]
+        .sort((a, b) => b.score - a.score || Number(!!a.isMe) - Number(!!b.isMe))
+        .map((r, i) => ({ ...r, rank: i + 1 }));
+    },
+    getMyRank() { return this.getGroupLeaderboard().find(e => e.isMe).rank; },
+    recordStageClear(stats) {
+      const { songId, diff, sessionId, rankGrade } = stats;
+      const root = current(), week = season(root), prevRank = rankFor(getIsoWeekKey(), total(week.scores));
+      if (!root.user || typeof sessionId !== 'string' || !sessionId || root.sessions.includes(sessionId)) return { duplicate: true, earnedCoins: 0, xp: 0, cores: 0, isNewBest: false, prevRank, newRank: prevRank, rankDelta: 0 };
+      if (!DIFFICULTIES.includes(diff) || !Number.isFinite(stats.score) || stats.score < 0) throw new Error('Invalid stage result');
+      const key = `${songId}__${diff}`, prev = root.scores[key];
+      const isNewBest = !prev || prev.version !== 2 || stats.score > prev.score;
+      const record = { score: number(stats.score), maxCombo: Math.floor(number(stats.maxCombo)), rank: rankGrade, version: 2 };
+      // Only one custom chart record is retained; custom uploads never enter the official league.
+      if (!OFFICIAL_SONGS.includes(songId)) Object.keys(root.scores).filter(k => k.startsWith('custom_')).forEach(k => delete root.scores[k]);
+      if (isNewBest) root.scores[key] = record;
+      const cleared = stats.cleared === true && number(stats.accuracy, 0, 1) >= .65;
+      const official = OFFICIAL_SONGS.includes(songId);
+      if (cleared && official) {
+        if (!week.scores[key] || stats.score > week.scores[key].score) week.scores[key] = record;
+        week.plays++;
       }
-      return rivals;
+      const earnedCoins = cleared ? Math.round((180 + Math.floor(stats.score / 4500)) * (root.user.vip ? 2 : 1)) : 0;
+      const xp = cleared ? 120 : 0, cores = cleared ? 3 : 0;
+      root.user.coins += earnedCoins; root.user.xp += xp; root.user.cores += cores;
+      root.sessions.push(sessionId); root.sessions = root.sessions.slice(-128);
+      const newRank = rankFor(getIsoWeekKey(), total(week.scores));
+      save(root);
+      return { earnedCoins, xp, cores, isNewBest, prevRank, newRank, rankDelta: prevRank - newRank, weeklyTotal: total(week.scores), persistent: store.persistent };
     },
-
-    getAllSongScores() {
-      try {
-        return JSON.parse(localStorage.getItem(SCORES_STORAGE_KEY) || '{}');
-      } catch (_) {
-        return {};
-      }
-    },
-
-    getSongBest(songId, diff) {
-      const map = this.getAllSongScores();
-      const key = `${songId}__${diff}`;
-      return map[key] || { score: 0, maxCombo: 0, rank: 'A' };
-    },
-
-    getMyWeeklyTotalScore() {
-      const map = this.getAllSongScores();
-      // Sum best score per song (across its highest difficulty) so playing multiple songs climbs the 30-player league naturally
-      const perSongMax = {};
-      Object.keys(map).forEach(k => {
-        const songId = k.split('__')[0];
-        const s = map[k].score || 0;
-        if (!perSongMax[songId] || s > perSongMax[songId]) {
-          perSongMax[songId] = s;
-        }
-      });
-      return Object.values(perSongMax).reduce((acc, v) => acc + v, 0);
-    },
-
-    getGroupLeaderboard() {
-      const user = window.AuthService.getCurrentUser() || {
-        uid: 'guest_local',
-        nickname: 'Runner',
-        provider: 'guest',
-        provider_badge: 'P'
-      };
-      const myTotal = this.getMyWeeklyTotalScore();
-      const meEntry = {
-        uid: user.uid,
-        nickname: user.nickname,
-        provider: user.provider || 'guest',
-        provider_badge: (PROVIDER_META[user.provider] || PROVIDER_META.guest).badge,
-        score: myTotal,
-        group_id: this.groupId,
-        updated_at: new Date().toISOString(),
-        isMe: true
-      };
-
-      const combined = [...this.getRivals(), meEntry].sort((a, b) => b.score - a.score);
-      combined.forEach((item, idx) => {
-        item.rank = idx + 1;
-      });
-      return combined;
-    },
-
-    getMyRank() {
-      const board = this.getGroupLeaderboard();
-      const me = board.find(e => e.isMe);
-      return me ? me.rank : 30;
-    },
-
-    recordStageClear({ songId, diff, score, maxCombo, rankGrade }) {
-      const prevRank = this.getMyRank();
-      const map = this.getAllSongScores();
-      const key = `${songId}__${diff}`;
-      const prevBest = map[key] ? map[key].score : 0;
-      const isNewBest = score > prevBest;
-
-      if (isNewBest) {
-        map[key] = {
-          score,
-          maxCombo,
-          rank: rankGrade,
-          updatedAt: new Date().toISOString()
-        };
-        localStorage.setItem(SCORES_STORAGE_KEY, JSON.stringify(map));
-      } else if (!map[key]) {
-        map[key] = { score, maxCombo, rank: rankGrade, updatedAt: new Date().toISOString() };
-        localStorage.setItem(SCORES_STORAGE_KEY, JSON.stringify(map));
-      }
-
-      // Gently nudge 2 random AI rivals slightly so league feels alive
-      const rivals = this.getRivals();
-      const idx = Math.floor(Math.random() * rivals.length);
-      if (rivals[idx] && rivals[idx].score < 950000) {
-        rivals[idx].score += Math.floor(400 + Math.random() * 1200);
-        localStorage.setItem(RIVALS_STORAGE_KEY, JSON.stringify(rivals));
-      }
-
-      const newRank = this.getMyRank();
-      const user = window.AuthService.getCurrentUser();
-      if (user) {
-        CloudRankingAdapter.syncScore({
-          uid: user.uid,
-          nickname: user.nickname,
-          provider_badge: (PROVIDER_META[user.provider] || PROVIDER_META.guest).badge,
-          score: this.getMyWeeklyTotalScore(),
-          group_id: this.groupId,
-          updated_at: new Date().toISOString()
-        });
-      }
-
-      return {
-        prevRank,
-        newRank,
-        rankDelta: prevRank - newRank,
-        isNewBest,
-        weeklyTotal: this.getMyWeeklyTotalScore()
-      };
-    },
-
     getLiveGhostRivals(songTargetScore = 240000) {
-      const rivals = this.getRivals();
-      // Pick 4 rivals scaled to single-song target scores for live race feel
-      const picks = [rivals[2], rivals[8], rivals[15], rivals[22]].filter(Boolean);
-      const factors = [1.15, 0.92, 0.68, 0.45];
-      return picks.map((r, i) => ({
-        nickname: r.nickname,
-        provider: r.provider,
-        badge: r.provider_badge,
-        targetScore: Math.round(songTargetScore * factors[i])
-      }));
+      return [2, 8, 15, 22].map((idx, i) => { const r = this.getRivals()[idx]; return { nickname: r.nickname, provider: r.provider, badge: r.provider_badge, targetScore: Math.round(songTargetScore * [1.15, .92, .68, .45][i]) }; });
     },
-
     claimWeeklyReward() {
-      const claimKey = getWeeklyClaimKey();
-      if (localStorage.getItem(claimKey) === 'claimed') {
-        return { ok: false };
-      }
-      localStorage.setItem(claimKey, 'claimed');
-      const user = window.AuthService.getCurrentUser();
-      if (user) {
-        window.AuthService.updateUser({ coins: (user.coins || 0) + 500 });
-      }
-      return { ok: true, coinsAdded: 500 };
+      const root = current(); if (!root.user) return { ok: false, reason: 'reward_wait' };
+      const key = Object.keys(root.weeks).sort().find(k => k < getIsoWeekKey() && root.weeks[k].settled && root.weeks[k].plays > 0 && !root.weeks[k].claimed);
+      if (!key) return { ok: false, reason: 'reward_wait' };
+      const w = root.weeks[key], coinsAdded = w.finalRank <= 10 ? 500 : 200;
+      w.claimed = true; root.user.coins += coinsAdded; save(root);
+      return { ok: true, coinsAdded };
+    },
+    claimDemoReward() {
+      const root = current(), today = new Date().toISOString().slice(0, 10);
+      if (!root.user || root.demoClaimDay === today) return { ok: false, reason: 'reward_already' };
+      root.demoClaimDay = today; root.user.coins += 300; save(root); return { ok: true, coinsAdded: 300 };
+    },
+    getSeasonInfo() {
+      const root = current();
+      return { week: getIsoWeekKey(), league: root.user?.league || 0 };
     }
   };
 })();

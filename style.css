@@ -1828,3 +1828,90 @@ html, body {
     display: none;
   }
 }
+
+/* Mobile layouts use the available width rather than desktop minimums. */
+@media (max-width: 960px) {
+  .scene:not(#scene-game) { padding-top: 64px; }
+  .top-nav-bar { flex-wrap: wrap; padding-right: 0; }
+}
+.app-root { height: 100dvh; }
+.three-canvas-container, .sprite-ctrl-btn { touch-action: none; }
+.prototype-notice { color: #ffe09b; font-size: 12px; line-height: 1.5; }
+.manual-fever-btn { color: var(--gold); background: #201336; border: 1px solid var(--gold); border-radius: 8px; padding: 5px 12px; cursor: pointer; pointer-events: auto; }
+button:disabled { opacity: .5; cursor: default; }
+.result-grade-text { font-size: 40px; color: var(--gold); }
+.modal-panel { overflow-y: auto; }
+.setting-row > input, .setting-row > select { min-width: 0; max-width: 52%; }
+.cyber-text-input option { color: white; background: #16112f; }
+.ingame-bottom-controls { bottom: max(14px, env(safe-area-inset-bottom)); }
+@media (max-width: 600px) {
+  .scene:not(#scene-game) { overflow-y: auto; gap: 14px; padding-top: 64px; }
+  .top-nav-bar { padding-right: 0; flex-wrap: wrap; }
+  .scene-header-title { font-size: 22px; }
+  .user-profile-chip { flex-wrap: wrap; max-width: 100%; }
+  .character-cards-grid { grid-template-columns: 1fr; flex: none; gap: 16px; }
+  .runner-card { min-width: 0; }
+  .runner-art-wrap { flex: none; height: 190px; }
+  .runner-title-row { flex-wrap: wrap; gap: 4px; }
+  .character-bottom-bar { flex-direction: column; gap: 10px; }
+  .login-layout { height: auto; margin: auto; min-width: 0; }
+  .login-left-col, .login-glass-box { min-width: 0; max-width: 100%; }
+  .brand-kicker { letter-spacing: .03em; }
+  .brand-title { font-size: 29px; }
+  .login-version-bar { flex-wrap: wrap; gap: 6px; }
+  .lobby-main-grid, .result-main-layout { flex: none; overflow: visible; }
+  .lobby-brand-mini { flex-wrap: wrap; }
+  .nav-left-group, .nav-right-group { width: 100%; }
+  .frame-btn { white-space: normal; text-align: center; }
+  .lobby-stage-deck-col { gap: 16px; }
+  .song-cover-card { width: 100%; min-width: 0; }
+  .song-hologram-Showcase { padding-bottom: 62px; }
+  .highscore-floating-box { bottom: 0; right: 0; }
+  .difficulty-tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); width: 100%; border-radius: 12px; gap: 2px; }
+  .diff-pill { padding: 7px 3px; }
+  .start-run-neon-btn { width: 100%; justify-content: center; }
+  .ingame-top-hud { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; padding: max(10px, env(safe-area-inset-top)) 10px 0; }
+  .hud-left-cluster { gap: 6px; flex-wrap: wrap; }
+  .hud-diff-badge { padding: 4px 6px; font-size: 11px; }
+  .hud-combo-box strong { font-size: 24px; }
+  .hud-center-cluster { grid-column: 1 / -1; grid-row: 2; }
+  .hud-right-cluster { grid-column: 2; grid-row: 1; min-width: 0; }
+  .hud-score-box { max-width: 100%; padding: 6px 8px; }
+  #hud-song-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 130px; }
+  .song-progress-mini { width: 100%; }
+  .fever-gauge-shell, .hp-bar-shell { width: 100%; }
+  .branch-choice-overlay { top: 30%; gap: 6px; align-items: stretch; }
+  .branch-sign-card { padding: 8px; flex: 1; min-width: 0; }
+  .branch-title { font-size: 12px; }
+  .branch-center-prompt { position: absolute; top: -42px; left: 0; right: 0; padding: 6px; text-align: center; border-radius: 8px; font-size: 10px; }
+  .ingame-bottom-controls { left: 10px; right: 10px; }
+  .sprite-ctrl-btn { width: 58px; height: 64px; }
+  .lane-btn-pair, .action-btn-pair { gap: 6px; }
+  .result-top-banner { padding-right: 0; gap: 8px; }
+  .result-title-glow { font-size: 24px; letter-spacing: 0; }
+  .result-rank-header { gap: 10px; flex-wrap: wrap; }
+  .result-actions-row { flex-direction: column; }
+  .result-rank-promo-box { flex-wrap: wrap; gap: 6px; }
+  .judge-counts-row { flex-wrap: wrap; gap: 8px; font-size: 12px; }
+  .reward-items-row { gap: 4px; }
+  .reward-tile { padding: 8px 3px; font-size: 10px; }
+  .modal-panel { padding: 14px; max-height: 90dvh; }
+  .modal-header h3 { font-size: 19px; }
+  .setting-row { font-size: 12px; }
+  .ranking-table { font-size: 11px; }
+  .ranking-table th, .ranking-table td { padding: 8px 5px; overflow-wrap: anywhere; }
+  .ranking-table-wrap { min-height: 100px; }
+}
+@media (max-height: 500px) {
+  .scene:not(#scene-game) { overflow-y: auto; justify-content: flex-start; gap: 12px; }
+  .login-layout { height: auto; }
+  .character-cards-grid, .lobby-main-grid, .result-main-layout { flex: none; }
+  .ingame-top-hud { padding: 6px 10px 0; }
+  .hud-ghost-stack { display: none; }
+  .branch-choice-overlay { top: 34%; }
+  .sprite-ctrl-btn { width: 54px; height: 54px; }
+  .modal-panel { overflow-y: auto; max-height: 92dvh; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}

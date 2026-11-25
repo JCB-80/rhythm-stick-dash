@@ -10,7 +10,10 @@
     judgeTimer: null,
     slashTimer: null,
     feverPopupTimer: null,
-    toastTimer: null
+    toastTimer: null,
+    starting: false,
+    uploading: false,
+    lastStats: null
   };
 
   const CHARACTER_LIST = [
@@ -203,6 +206,7 @@
       window.AudioEngine.playUiClick();
       dropdown.classList.toggle('hidden');
       syncActiveOption();
+      $('settings-language').value = window.I18n.current;
     });
 
     document.querySelectorAll('.lang-option').forEach(opt => {
@@ -221,8 +225,10 @@
       renderLoginButtons();
       if (state.currentScene === 'scene-character') renderCharacterSelect();
       if (state.currentScene === 'scene-lobby') renderLobby();
+      if (state.currentScene === 'scene-result' && state.lastStats) renderResultMeta(state.lastStats);
       if (!$('modal-ranking').classList.contains('hidden')) renderRankingModal();
       syncActiveOption();
+      $('settings-language').value = window.I18n.current;
     });
 
     window.I18n.applyAll();
@@ -233,13 +239,17 @@
   async function handleSocialSignIn(provider) {
     window.AudioEngine.playUiClick();
     $('auth-loading-overlay').classList.remove('hidden');
-    const user = await window.AuthService.signIn(provider);
-    window.AuthService.updateUser({ loggedOut: false });
-    $('auth-loading-overlay').classList.add('hidden');
+    try {
+      const user = await window.AuthService.signIn(provider);
+      window.AuthService.updateUser({ loggedOut: false });
+      $('auth-loading-overlay').classList.add('hidden');
 
-    state.selectedChar = user.selectedChar || 'luna';
-    window.AudioEngine.setVolumes(user.settings.bgmVol, user.settings.sfxVol);
-    switchScene('scene-character');
+      state.selectedChar = user.selectedChar || 'luna';
+      window.AudioEngine.setVolumes(user.settings.bgmVol, user.settings.sfxVol);
+      switchScene('scene-character');
+      if (!window.GameStorage.persistent) showToast(window.I18n.t('storage_warning'));
+    } catch (error) { showToast(window.I18n.t('auth_error')); console.error(error); }
+    finally { $('auth-loading-overlay').classList.add('hidden'); }
   }
 
   // ==================== SCENE 2: CHARACTER SELECT ====================
@@ -334,10 +344,10 @@
     // Update Selected Song Hologram Deck
     const curSong = getSelectedSong();
     $('selected-song-title').textContent = curSong.title.toUpperCase();
-    $('selected-song-desc').textContent = window.I18n.t(curSong.descKey);
-    $('selected-song-bpm').textContent = curSong.bpm;
+    $('selected-song-desc').textContent = window.I18n.t(curSong.isCustom ? 'custom_grid_hint' : curSong.descKey);
+    $('selected-song-bpm').textContent = curSong.isCustom ? `${curSong.bpm}*` : curSong.bpm;
     $('selected-song-len').textContent = curSong.lengthText;
-    $('selected-song-artist').textContent = curSong.artist;
+    $('selected-song-artist').textContent = curSong.isCustom ? window.I18n.t('custom_track_badge') : curSong.artist;
 
     const coverEl = $('song-cover-visual');
     coverEl.style.backgroundImage = `
@@ -354,50 +364,78 @@
     // Best Score & Rank Emblem
     const best = window.RankingEngine.getSongBest(curSong.id, state.selectedDiff);
     $('lobby-high-score').textContent = (best.score || 0).toLocaleString();
-    $('lobby-best-rank-img').src = (best.rank === 'S+' || best.score >= 180000)
+    $('lobby-best-rank-img').classList.toggle('hidden', !['S+', 'A'].includes(best.rank));
+    $('lobby-best-rank-img').src = (best.rank === 'S+')
       ? './assets/sprites_transparent/rank_s_plus.png'
       : './assets/sprites_transparent/rank_a.png';
   }
 
   // ==================== SCENE 4: 3D GAMEPLAY & LIVE HUD ====================
-  function startGameplay() {
-    const song = getSelectedSong();
-    const user = window.AuthService.getCurrentUser();
-    const autoFever = user && user.settings ? user.settings.autoFever : true;
+  async function startGameplay() {
+    if (state.starting || state.uploading) return;
+    state.starting = true;
+    try {
+      if (state.game3D?.contextLost) { state.game3D.dispose(); state.game3D = null; }
+      await window.ThreeReady;
+      if (!window.THREE) throw new Error('WebGL library unavailable');
+      await window.AudioEngine.prepare();
+      if (document.hidden) throw new Error('audio_unavailable');
+      const song = getSelectedSong();
+      const user = window.AuthService.getCurrentUser();
+      const autoFever = user && user.settings ? user.settings.autoFever : true;
 
-    switchScene('scene-game');
+      switchScene('scene-game');
 
-    $('hud-diff-badge').textContent = state.selectedDiff;
-    $('hud-combo-num').textContent = '0';
-    $('hud-score-num').textContent = '0';
-    $('hud-song-name').textContent = song.title;
-    $('hud-fever-fill').style.width = '0%';
-    $('hud-hp-fill').style.width = '100%';
-    $('hud-time-fill').style.width = '0%';
-    $('hud-route-mult').textContent = '1.0x';
-    $('hud-fever-banner').classList.add('hidden');
-    $('fever-screen-fx').classList.add('hidden');
-    $('branch-choice-overlay').classList.add('hidden');
+      ['judgeTimer', 'slashTimer', 'feverPopupTimer'].forEach(key => clearTimeout(state[key]));
+      ['judge-popup-img', 'vfx-slash-img', 'fever-popup-img'].forEach(id => $(id).classList.add('hidden'));
+      state._lastGhostTick = -1;
+      $('hud-diff-badge').textContent = state.selectedDiff;
+      $('hud-combo-num').textContent = '0';
+      $('hud-score-num').textContent = '0';
+      $('hud-song-name').textContent = song.title;
+      $('hud-fever-fill').style.width = '0%';
+      $('hud-hp-fill').style.width = '100%';
+      $('hud-time-fill').style.width = '0%';
+      $('hud-route-mult').textContent = '1.0x';
+      $('hud-fever-banner').classList.add('hidden');
+      $('fever-screen-fx').classList.add('hidden');
+      $('branch-choice-overlay').classList.add('hidden');
 
-    // Initialize 4 Ghost Rivals on Left & Right HUD
-    state.ghostRivals = window.RankingEngine.getLiveGhostRivals(250000);
-    updateGhostHud(0, 1);
+      // Initialize 4 Ghost Rivals on Left & Right HUD
+      state.ghostRivals = window.RankingEngine.getLiveGhostRivals(250000);
+      updateGhostHud(0, 0);
 
-    if (!state.game3D) {
-      state.game3D = new window.RhythmGame3D($('three-canvas-container'), {
-        onJudgment: handleJudgmentHud,
-        onFeverState: handleFeverHud,
-        onFrameUpdate: handleFrameHud,
-        onStageClear: handleStageClear
+      if (!state.game3D) {
+        state.game3D = new window.RhythmGame3D($('three-canvas-container'), {
+          onJudgment: handleJudgmentHud,
+          onFeverState: handleFeverHud,
+          onFrameUpdate: handleFrameHud,
+          onStageClear: handleStageClear
+        });
+      }
+
+      state.game3D.startSession({
+        song,
+        difficulty: state.selectedDiff,
+        charId: state.selectedChar,
+        autoFever,
+        audioOffset: user?.settings.audioOffset || 0,
+        vip: !!user?.vip
       });
-    }
-
-    state.game3D.startSession({
-      song,
-      difficulty: state.selectedDiff,
-      charId: state.selectedChar,
-      autoFever
-    });
+      if (!state.game3D._contextEventsBound) {
+        state.game3D._contextEventsBound = true;
+        state.game3D.renderer.domElement.addEventListener('webglcontextlost', event => {
+          event.preventDefault(); state.game3D.pause(); openSettingsModal(true);
+          state.game3D.contextLost = true; showToast(window.I18n.t('game_error'));
+        });
+        state.game3D.renderer.domElement.addEventListener('webglcontextrestored', () => { state.game3D.contextLost = false; });
+      }
+    } catch (error) {
+      console.error('Game initialization failed:', error);
+      if (state.game3D) { state.game3D.dispose(); state.game3D = null; }
+      switchScene('scene-lobby');
+      showToast(window.I18n.t('game_error'));
+    } finally { state.starting = false; }
   }
 
   function updateGhostHud(myScore, progressFrac) {
@@ -441,12 +479,11 @@
       GREAT: './assets/sprites_transparent/judge_great.png',
       MISS: './assets/sprites_transparent/judge_miss.png'
     };
-    judgeImg.src = spriteMap[grade] || spriteMap.PERFECT;
+    judgeImg.src = spriteMap[grade] || spriteMap.MISS;
     judgeImg.classList.remove('hidden');
     // Retrigger CSS animation cleanly
-    judgeImg.style.animation = 'none';
-    void judgeImg.offsetWidth;
-    judgeImg.style.animation = '';
+    judgeImg.getAnimations().forEach(animation => animation.cancel());
+    judgeImg.animate([{ transform: 'scale(.65)', opacity: 0 }, { transform: 'scale(1.05)', opacity: 1 }, { transform: 'scale(1)', opacity: 1 }], { duration: 320, fill: 'forwards' });
 
     clearTimeout(state.judgeTimer);
     state.judgeTimer = setTimeout(() => judgeImg.classList.add('hidden'), 420);
@@ -455,9 +492,8 @@
     if (grade !== 'MISS') {
       const slashImg = $('vfx-slash-img');
       slashImg.classList.remove('hidden');
-      slashImg.style.animation = 'none';
-      void slashImg.offsetWidth;
-      slashImg.style.animation = '';
+      slashImg.getAnimations().forEach(animation => animation.cancel());
+      slashImg.animate([{ transform: 'scale(.65) rotate(-18deg)', opacity: 1 }, { transform: 'scale(1.3) rotate(16deg)', opacity: 0 }], { duration: 240, fill: 'forwards' });
       clearTimeout(state.slashTimer);
       state.slashTimer = setTimeout(() => slashImg.classList.add('hidden'), 240);
     }
@@ -483,6 +519,8 @@
     $('hud-time-fill').style.width = `${pct.toFixed(1)}%`;
     $('hud-fever-fill').style.width = `${Math.round(frame.feverGauge)}%`;
     $('hud-route-mult').textContent = `${frame.totalMult.toFixed(1)}x`;
+    $('hud-fever-banner').textContent = window.I18n.t('fever_overdrive') + ` ×${frame.totalMult.toFixed(1)}`;
+    $('btn-manual-fever').disabled = frame.isFever || frame.feverGauge < 100;
 
     // Y-Branch choice overlay
     const branchOverlay = $('branch-choice-overlay');
@@ -503,26 +541,35 @@
   }
 
   // ==================== SCENE 5: STAGE CLEAR & RANKING UPDATE ====================
+  function renderResultMeta(stats) {
+    const charMeta = CHARACTER_LIST.find(c => c.id === stats.charId) || CHARACTER_LIST[1];
+    $('result-diff-runner').textContent = `${stats.difficulty} · ${window.I18n.t(charMeta.nameKey)}`;
+    $('result-grade-text').textContent = stats.rankGrade;
+    $('result-stage-title').textContent = window.I18n.t(stats.cleared ? 'stage_clear' : 'stage_complete');
+  }
+
   function handleStageClear(stats) {
+    state.lastStats = stats;
     window.AudioEngine.playClearFanfare();
 
-    const user = window.AuthService.getCurrentUser();
-    const vipMult = (user && user.vip) ? 2 : 1;
-    const earnedCoins = Math.round((180 + Math.floor(stats.score / 4500)) * vipMult);
-    if (user) {
-      window.AuthService.updateUser({ coins: (user.coins || 0) + earnedCoins });
+    let rankRes;
+    try {
+      rankRes = window.RankingEngine.recordStageClear({
+        songId: stats.song.id, diff: stats.difficulty, score: stats.score, maxCombo: stats.maxCombo,
+        rankGrade: stats.rankGrade, sessionId: stats.sessionId, cleared: stats.cleared, accuracy: stats.accuracy
+      });
+    } catch (error) {
+      console.error(error);
+      rankRes = { earnedCoins: 0, xp: 0, cores: 0, isNewBest: false, rankDelta: 0, newRank: '--' };
+      showToast(window.I18n.t('save_error'));
     }
-
-    const rankRes = window.RankingEngine.recordStageClear({
-      songId: stats.song.id,
-      diff: stats.difficulty,
-      score: stats.score,
-      maxCombo: stats.maxCombo,
-      rankGrade: stats.rankGrade
-    });
+    const earnedCoins = rankRes.earnedCoins;
+    if (!window.GameStorage.persistent) showToast(window.I18n.t('storage_warning'));
 
     const charMeta = CHARACTER_LIST.find(c => c.id === stats.charId) || CHARACTER_LIST[1];
+    renderResultMeta(stats);
     $('result-char-img').src = charMeta.img;
+    $('result-rank-img').classList.toggle('hidden', !['S+', 'A'].includes(stats.rankGrade));
     $('result-rank-img').src = stats.rankGrade === 'S+'
       ? './assets/sprites_transparent/rank_s_plus.png'
       : './assets/sprites_transparent/rank_a.png';
@@ -535,6 +582,8 @@
     $('res-cnt-miss').textContent = stats.miss;
     $('result-combo-val').textContent = stats.maxCombo;
     $('result-coins-earned').textContent = `+${earnedCoins}`;
+    $('result-xp-earned').textContent = `EXP +${rankRes.xp}`;
+    $('result-cores-earned').textContent = `BEAT CORE +${rankRes.cores}`;
 
     if (rankRes.rankDelta > 0) {
       $('result-rank-promo-label').setAttribute('data-i18n', 'res_rank_up');
@@ -555,6 +604,7 @@
     const tick = (now) => {
       const p = Math.min(1, (now - t0) / 800);
       const eased = 1 - Math.pow(1 - p, 3);
+      if (state.currentScene !== 'scene-result' || state.lastStats !== stats) return;
       scoreEl.textContent = Math.round(target * eased).toLocaleString();
       if (p < 1) requestAnimationFrame(tick);
     };
@@ -563,8 +613,10 @@
 
   // ==================== MODALS: 30-PLAYER RANKING, VIP, SETTINGS ====================
   function renderRankingModal() {
-    const entries = window.RankingEngine.getGroupLeaderboard();
-    $('ranking-group-id').textContent = window.RankingEngine.groupId;
+    const songMode = $('ranking-scope').value === 'song';
+    const song = getSelectedSong();
+    const entries = window.RankingEngine.getGroupLeaderboard(songMode ? song.id : undefined, state.selectedDiff);
+    $('ranking-group-id').textContent = `${window.RankingEngine.getSeasonInfo().week} · ${window.I18n.t('league_' + window.RankingEngine.getSeasonInfo().league)} · ${songMode ? song.title + ' / ' + state.selectedDiff : window.RankingEngine.groupId}`;
     const tbody = $('ranking-tbody');
     tbody.innerHTML = '';
 
@@ -591,8 +643,10 @@
       $('input-sfx-vol').value = Math.round((user.settings.sfxVol ?? 0.85) * 100);
       $('input-auto-fever').checked = !!user.settings.autoFever;
       $('input-nickname').value = user.nickname || '';
+      $('input-audio-offset').value = Math.round(user.settings.audioOffset * 1000);
     }
 
+    $('settings-language').value = window.I18n.current;
     const titleEl = $('settings-modal-title');
     titleEl.setAttribute('data-i18n', fromGameplayPause ? 'pause_title' : 'settings_title');
     titleEl.textContent = window.I18n.t(fromGameplayPause ? 'pause_title' : 'settings_title');
@@ -609,13 +663,25 @@
     const nick = $('input-nickname').value.trim();
 
     window.AudioEngine.setVolumes(bgmVol, sfxVol);
-    const patch = { settings: { bgmVol, sfxVol, autoFever } };
+    const offsetValue = Number($('input-audio-offset').value);
+    const audioOffset = Number.isFinite(offsetValue) ? Math.max(-250, Math.min(250, offsetValue)) / 1000 : 0;
+    const patch = { settings: { bgmVol, sfxVol, autoFever, audioOffset } };
     if (nick.length >= 2) patch.nickname = nick;
     window.AuthService.updateUser(patch);
 
-    if (state.game3D) state.game3D.autoFever = autoFever;
+    if (state.game3D) { state.game3D.autoFever = autoFever; state.game3D.audioOffset = audioOffset; }
     if (state.currentScene === 'scene-lobby') renderLobby();
     if (state.currentScene === 'scene-character') renderCharacterSelect();
+  }
+
+  async function resumeGameplay() {
+    try {
+      if (state.game3D?.contextLost) throw new Error('WebGL context lost');
+      await window.AudioEngine.prepare();
+      if (document.hidden || state.currentScene !== 'scene-game' || !state.game3D?.active) return;
+      saveSettingsFromModal();
+      state.game3D.resume(); $('modal-settings').classList.add('hidden');
+    } catch (error) { console.error(error); showToast(window.I18n.t('game_error')); }
   }
 
   // ==================== EVENT BINDINGS & KEYBOARD / TOUCH CONTROLS ====================
@@ -659,16 +725,19 @@
     // Custom MP3 upload
     $('mp3-file-input').addEventListener('change', async (e) => {
       const file = e.target.files && e.target.files[0];
-      if (!file) return;
+      if (!file || state.uploading) return;
+      state.uploading = true;
+      $('btn-start-run').disabled = true;
+      showToast(window.I18n.t('mp3_loading'));
       try {
         const customSong = await window.AudioEngine.loadCustomMp3(file);
         state.selectedSongId = customSong.id;
-        renderLobby();
+        if (state.currentScene === 'scene-lobby') { renderLobby(); window.AudioEngine.startLobbyPreview(customSong); }
         showToast(`🎵 ${customSong.title}`);
       } catch (err) {
         console.error('MP3 decode error:', err);
-      }
-      e.target.value = '';
+        showToast(window.I18n.t(['mp3_size', 'mp3_length'].includes(err.message) ? err.message : 'mp3_error'));
+      } finally { state.uploading = false; $('btn-start-run').disabled = false; e.target.value = ''; }
     });
 
     // Modals open/close
@@ -681,7 +750,7 @@
     $('btn-claim-weekly').addEventListener('click', () => {
       window.AudioEngine.playUiClick();
       const res = window.RankingEngine.claimWeeklyReward();
-      showToast(window.I18n.t(res.ok ? 'reward_claimed' : 'reward_already'));
+      showToast(res.ok ? `${window.I18n.t('reward_received')} +${res.coinsAdded}` : window.I18n.t(res.reason || 'reward_already'));
       if (state.currentScene === 'scene-lobby') renderLobby();
     });
 
@@ -698,18 +767,16 @@
     $('btn-activate-vip').addEventListener('click', () => {
       window.AudioEngine.playClearFanfare();
       window.AuthService.updateUser({ vip: true });
+      $('vip-btn-label').setAttribute('data-i18n', 'vip_active');
       $('vip-btn-label').textContent = window.I18n.t('vip_active');
       showToast('👑 ' + window.I18n.t('vip_active'));
     });
 
     $('btn-free-ad-coins').addEventListener('click', () => {
       window.AudioEngine.playUiClick();
-      const user = window.AuthService.getCurrentUser();
-      if (user) {
-        window.AuthService.updateUser({ coins: (user.coins || 0) + 300 });
-        if (state.currentScene === 'scene-lobby') renderLobby();
-      }
-      showToast('🪙 +300 COINS!');
+      const res = window.RankingEngine.claimDemoReward();
+      if (res.ok && state.currentScene === 'scene-lobby') renderLobby();
+      showToast(res.ok ? window.I18n.t('reward_received') + ' +300' : window.I18n.t(res.reason));
     });
 
     $('btn-open-settings').addEventListener('click', () => {
@@ -730,8 +797,8 @@
         const modalId = btn.getAttribute('data-close-modal');
         $(modalId).classList.add('hidden');
         if (modalId === 'modal-settings' && state.currentScene === 'scene-game' && state.game3D) {
-          saveSettingsFromModal();
-          state.game3D.resume();
+          $('modal-settings').classList.remove('hidden');
+          resumeGameplay();
         }
       });
     });
@@ -744,9 +811,7 @@
     });
 
     $('btn-pause-resume').addEventListener('click', () => {
-      saveSettingsFromModal();
-      $('modal-settings').classList.add('hidden');
-      if (state.game3D) state.game3D.resume();
+      resumeGameplay();
     });
 
     $('btn-pause-retry').addEventListener('click', () => {
@@ -781,22 +846,34 @@
     bindActionBtn('btn-ctrl-swipe', () => state.game3D && state.game3D.triggerSwipe());
 
     // Direct touch/mouse swipe gesture on 3D canvas
-    let dragStartX = null;
+    const drags = new Map();
     const canvasWrap = $('three-canvas-container');
     canvasWrap.addEventListener('pointerdown', e => {
-      dragStartX = e.clientX;
+      if (!state.game3D?.active || state.game3D.paused) return;
+      drags.set(e.pointerId, e.clientX);
+      canvasWrap.setPointerCapture(e.pointerId);
     });
     canvasWrap.addEventListener('pointerup', e => {
-      if (dragStartX === null || !state.game3D) return;
-      const dx = e.clientX - dragStartX;
-      dragStartX = null;
+      const start = drags.get(e.pointerId); drags.delete(e.pointerId);
+      if (start === undefined || !state.game3D) return;
+      const dx = e.clientX - start;
       if (Math.abs(dx) > 42) {
-        state.game3D.moveLane(dx < 0 ? -1 : 1);
-        state.game3D.triggerSwipe();
-      } else {
-        state.game3D.triggerTap();
+        const struck = state.game3D.moveLane(dx < 0 ? -1 : 1);
+        if (!struck) state.game3D.triggerSwipe();
+      } else state.game3D.triggerTap();
+    });
+    canvasWrap.addEventListener('pointercancel', e => drags.delete(e.pointerId));
+    canvasWrap.addEventListener('lostpointercapture', e => drags.delete(e.pointerId));
+    $('btn-manual-fever').addEventListener('click', () => state.game3D?.activateFever());
+    $('settings-language').addEventListener('change', e => window.I18n.setLang(e.target.value));
+    $('ranking-scope').addEventListener('change', renderRankingModal);
+    document.addEventListener('visibilitychange', () => {
+      drags.clear();
+      if (document.hidden && state.currentScene === 'scene-game' && state.game3D?.active && !state.game3D.paused) {
+        state.game3D.pause(); openSettingsModal(true);
       }
     });
+    window.addEventListener('pagehide', () => { if (state.game3D?.active) { state.game3D.pause(); openSettingsModal(true); } window.AudioEngine.stopLobbyPreview(); });
 
     // Keyboard Controls
     window.addEventListener('keydown', e => {
@@ -806,8 +883,7 @@
 
       if (k === 'escape') {
         if (state.game3D.paused) {
-          $('modal-settings').classList.add('hidden');
-          state.game3D.resume();
+          resumeGameplay();
         } else {
           state.game3D.pause();
           openSettingsModal(true);
@@ -815,7 +891,7 @@
         return;
       }
 
-      if (state.game3D.paused) return;
+      if (state.game3D.paused || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
 
       if (k === 'arrowleft' || k === 'a') {
         e.preventDefault();
@@ -830,6 +906,7 @@
         e.preventDefault();
         state.game3D.triggerSwipe();
       } else if (k === 'enter' || k === 'v') {
+        e.preventDefault();
         state.game3D.activateFever();
       }
     });

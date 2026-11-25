@@ -125,7 +125,7 @@ window.GAME_LOCALES = {
 window.I18n = {
   supported: ['ko', 'en', 'ja', 'zh-TW', 'es'],
   current: (function() {
-    const saved = localStorage.getItem('game_lang');
+    const saved = window.GameStorage.get('game_lang');
     if (saved && window.GAME_LOCALES[saved]) return saved;
     const nav = (navigator.language || 'ko').toLowerCase();
     if (nav.startsWith('ko')) return 'ko';
@@ -141,7 +141,7 @@ window.I18n = {
   setLang: function(lang) {
     if (!window.GAME_LOCALES[lang]) return;
     this.current = lang;
-    localStorage.setItem('game_lang', lang);
+    window.GameStorage.set('game_lang', lang);
     document.documentElement.lang = lang;
     document.querySelectorAll('[data-i18n]').forEach(el => {
       const k = el.getAttribute('data-i18n');

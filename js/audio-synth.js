@@ -90,10 +90,12 @@
       this.schedulerTimer = null;
       this.nextStepIndex = 0;
       this.customSourceNode = null;
+      this.voices = new Set();
 
       // Lobby preview state
       this.previewTimer = null;
       this.previewStep = 0;
+      this.previewRequest = 0;
     }
 
     ensureContext() {
@@ -116,9 +118,33 @@
       return this.ctx;
     }
 
+    async prepare() {
+      const ctx = this.ensureContext();
+      if (ctx.state !== 'running') await ctx.resume();
+      if (ctx.state !== 'running') throw new Error('audio_unavailable');
+    }
+
+    _trackVoice(node, bus, nodes = []) {
+      const voice = { node, bus, nodes };
+      this.voices.add(voice);
+      node.onended = () => {
+        this.voices.delete(voice);
+        try { node.disconnect(); } catch (_) {}
+        nodes.forEach(n => { try { n.disconnect(); } catch (_) {} });
+      };
+    }
+
+    _stopVoices(bus) {
+      for (const voice of [...this.voices]) {
+        if (voice.bus !== bus) continue;
+        try { voice.node.stop(); } catch (_) {}
+        voice.node.onended();
+      }
+    }
+
     setVolumes(bgm, sfx) {
-      this.bgmVolume = Math.max(0, Math.min(1, bgm));
-      this.sfxVolume = Math.max(0, Math.min(1, sfx));
+      this.bgmVolume = Number.isFinite(bgm) ? Math.max(0, Math.min(1, bgm)) : .75;
+      this.sfxVolume = Number.isFinite(sfx) ? Math.max(0, Math.min(1, sfx)) : .85;
       if (this.bgmGain && this.ctx) {
         this.bgmGain.gain.setValueAtTime(this.bgmVolume, this.ctx.currentTime);
       }
@@ -141,6 +167,7 @@
       gain.gain.exponentialRampToValueAtTime(0.001, time + 0.22);
       osc.connect(gain);
       gain.connect(dest);
+      this._trackVoice(osc, dest, [gain]);
       osc.start(time);
       osc.stop(time + 0.23);
     }
@@ -167,6 +194,7 @@
       noise.connect(filter);
       filter.connect(gain);
       gain.connect(dest);
+      this._trackVoice(noise, dest, [filter, gain]);
       noise.start(time);
     }
 
@@ -192,6 +220,7 @@
       noise.connect(filter);
       filter.connect(gain);
       gain.connect(dest);
+      this._trackVoice(noise, dest, [filter, gain]);
       noise.start(time);
     }
 
@@ -212,6 +241,7 @@
       osc.connect(filter);
       filter.connect(gain);
       gain.connect(dest);
+      this._trackVoice(osc, dest, [gain, filter]);
       osc.start(time);
       osc.stop(time + dur + 0.01);
     }
@@ -238,6 +268,8 @@
       osc2.connect(filter);
       filter.connect(gain);
       gain.connect(dest);
+      this._trackVoice(osc1, dest);
+      this._trackVoice(osc2, dest, [filter, gain]);
       osc1.start(time);
       osc2.start(time);
       osc1.stop(time + dur + 0.01);
@@ -245,14 +277,12 @@
     }
 
     // ==================== LOBBY PREVIEW ====================
-    startLobbyPreview(song) {
+    async startLobbyPreview(song) {
       this.stopLobbyPreview();
+      const request = this.previewRequest;
       if (!song) return;
-      try {
-        this.ensureContext();
-      } catch (_) {
-        return;
-      }
+      try { await this.prepare(); } catch (_) { return; }
+      if (request !== this.previewRequest || this.isPlaying) return;
       if (song.isCustom && song.audioBuffer) {
         if (this.ctx.state !== 'running') return;
         const src = this.ctx.createBufferSource();
@@ -281,6 +311,8 @@
     }
 
     stopLobbyPreview() {
+      this.previewRequest++;
+      this._stopVoices(this.previewGain);
       if (this.previewTimer) {
         clearInterval(this.previewTimer);
         this.previewTimer = null;
@@ -314,15 +346,14 @@
 
     _startCustomBuffer(offsetSec) {
       if (!this.currentSong || !this.currentSong.audioBuffer) return;
-      if (this.customSourceNode) {
-        try { this.customSourceNode.stop(); } catch (_) {}
-      }
+      this._stopVoices(this.bgmGain);
       const src = this.ctx.createBufferSource();
       src.buffer = this.currentSong.audioBuffer;
       src.connect(this.bgmGain);
       const startAt = this.ctx.currentTime + 0.04;
       this.songStartCtxTime = startAt - offsetSec;
-      src.start(startAt, offsetSec);
+      this._trackVoice(src, this.bgmGain);
+      src.start(startAt, Math.min(offsetSec, src.buffer.duration));
       this.customSourceNode = src;
     }
 
@@ -333,6 +364,9 @@
       const scheduleTick = () => {
         if (!this.isPlaying || this.isPaused || !this.currentSong) return;
         const lookAhead = 0.16;
+        // Skip expired beats after timer throttling instead of emitting a backlog.
+        const minStep = Math.max(0, Math.ceil((this.ctx.currentTime - this.songStartCtxTime - .015) / sixteenthDur));
+        this.nextStepIndex = Math.max(this.nextStepIndex, minStep);
         while (this.songStartCtxTime + this.nextStepIndex * sixteenthDur < this.ctx.currentTime + lookAhead) {
           const stepTime = this.songStartCtxTime + this.nextStepIndex * sixteenthDur;
           const elapsed = this.nextStepIndex * sixteenthDur;
@@ -364,7 +398,7 @@
         this.triggerSnare(time, this.bgmGain);
       }
       // Off-beat Hi-hats
-      if (barStep % 2 === 2) {
+      if (barStep % 4 === 2) {
         this.triggerHiHat(time, this.bgmGain, barStep === 10);
       } else if (isClimax && barStep % 2 === 1) {
         this.triggerHiHat(time, this.bgmGain, false);
@@ -386,13 +420,14 @@
     getSongTime() {
       if (!this.isPlaying || !this.ctx) return 0;
       if (this.isPaused) return this.pausedElapsed;
-      return Math.max(0, this.ctx.currentTime - this.songStartCtxTime);
+      return Math.max(this.pausedElapsed, this.ctx.currentTime - this.songStartCtxTime);
     }
 
     pauseSong() {
       if (!this.isPlaying || this.isPaused) return;
       this.pausedElapsed = this.getSongTime();
       this.isPaused = true;
+      this._stopVoices(this.bgmGain);
       if (this.schedulerTimer) {
         clearInterval(this.schedulerTimer);
         this.schedulerTimer = null;
@@ -411,13 +446,14 @@
         this._startCustomBuffer(this.pausedElapsed);
       } else {
         const sixteenthDur = 60 / this.currentSong.bpm / 4;
-        this.songStartCtxTime = this.ctx.currentTime - this.pausedElapsed;
+        this.songStartCtxTime = this.ctx.currentTime + .04 - this.pausedElapsed;
         this.nextStepIndex = Math.ceil(this.pausedElapsed / sixteenthDur);
         this._startSynthScheduler();
       }
     }
 
     stopSong() {
+      this._stopVoices(this.bgmGain);
       this.isPlaying = false;
       this.isPaused = false;
       if (this.schedulerTimer) {
@@ -431,10 +467,31 @@
     }
 
     // ==================== CUSTOM MP3 UPLOAD & ONSET BEAT DETECTOR ====================
+    async _readDuration(file) {
+      const url = URL.createObjectURL(file);
+      const audio = document.createElement('audio');
+      audio.preload = 'metadata';
+      try {
+        return await new Promise((resolve, reject) => {
+          const timer = setTimeout(() => reject(new Error('mp3_error')), 8000);
+          audio.onloadedmetadata = () => { clearTimeout(timer); resolve(audio.duration); };
+          audio.onerror = () => { clearTimeout(timer); reject(new Error('mp3_error')); };
+          audio.src = url;
+        });
+      } finally {
+        audio.onloadedmetadata = audio.onerror = null;
+        audio.removeAttribute('src'); audio.load(); URL.revokeObjectURL(url);
+      }
+    }
+
     async loadCustomMp3(file) {
-      this.ensureContext();
+      if (!file || file.size > 25 * 1024 * 1024 || !file.size) throw new Error('mp3_size');
+      const metadataDuration = await this._readDuration(file);
+      if (!Number.isFinite(metadataDuration) || metadataDuration < 8 || metadataDuration > 180) throw new Error('mp3_length');
+      await this.prepare();
       const arrayBuf = await file.arrayBuffer();
       const audioBuffer = await this.ctx.decodeAudioData(arrayBuf);
+      if (!Number.isFinite(audioBuffer.duration) || audioBuffer.duration < 8 || audioBuffer.duration > 180.1) throw new Error('mp3_length');
       const duration = Math.min(audioBuffer.duration, 180); // Cap at 3 mins for snappy play
       const mins = Math.floor(duration / 60);
       const secs = Math.floor(duration % 60);
@@ -450,6 +507,7 @@
         const end = Math.min(raw.length, i + winSamples);
         for (let j = i; j < end; j++) sum += raw[j] * raw[j];
         energies.push(Math.sqrt(sum / (end - i)));
+        if (energies.length % 400 === 0) await new Promise(resolve => setTimeout(resolve, 0));
       }
 
       const customPeaks = [];
@@ -467,9 +525,9 @@
 
       const cleanTitle = file.name.replace(/\.[^/.]+$/, '').slice(0, 26) || 'Custom Track';
       const customSong = {
-        id: 'custom_' + Date.now(),
+        id: 'custom_' + Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', await file.arrayBuffer()))).map(n => n.toString(16).padStart(2, '0')).join('').slice(0, 24),
         title: cleanTitle,
-        bpm: 135,
+        bpm: 135, // Fallback grid, explicitly labelled as an estimate in the UI.
         duration: Number(duration.toFixed(1)),
         lengthText,
         artist: I18n.t('custom_track_badge'),
@@ -495,7 +553,7 @@
     generateChart(song, difficulty) {
       const rand = seededRandom(song.title.length * 997 + difficulty.charCodeAt(0) * 131);
       const beatSec = 60 / song.bpm;
-      const hasBranch = difficulty !== 'EASY';
+      const hasBranch = difficulty !== 'EASY' && song.duration >= 24;
       const branchStart = hasBranch ? Math.min(22, song.duration * 0.34) : 9999;
       const branchDecision = hasBranch ? branchStart + 3.2 : 9999;
       const branchEnd = hasBranch ? Math.min(song.duration - 10, branchDecision + 18) : 9999;
@@ -597,6 +655,7 @@
       }
 
       notes.sort((a, b) => a.time - b.time);
+      notes.forEach((n, index) => { n.id = index; });
       return {
         notes,
         hasBranch,
@@ -629,6 +688,7 @@
         gain.gain.exponentialRampToValueAtTime(0.001, now + 0.11);
         osc.connect(gain);
         gain.connect(this.sfxGain);
+        this._trackVoice(osc, this.sfxGain, [gain]);
         osc.start(now);
         osc.stop(now + 0.12);
       } catch (_) {}
@@ -647,6 +707,7 @@
         gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
         osc.connect(gain);
         gain.connect(this.sfxGain);
+        this._trackVoice(osc, this.sfxGain, [gain]);
         osc.start(now);
         osc.stop(now + 0.16);
       } catch (_) {}
@@ -665,6 +726,7 @@
           gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.045 + 0.28);
           osc.connect(gain);
           gain.connect(this.sfxGain);
+          this._trackVoice(osc, this.sfxGain, [gain]);
           osc.start(now + idx * 0.045);
           osc.stop(now + idx * 0.045 + 0.29);
         });
@@ -684,9 +746,16 @@
         gain.gain.exponentialRampToValueAtTime(0.001, now + 0.055);
         osc.connect(gain);
         gain.connect(this.sfxGain);
+        this._trackVoice(osc, this.sfxGain, [gain]);
         osc.start(now);
         osc.stop(now + 0.06);
       } catch (_) {}
+    }
+
+    dispose() {
+      this.stopSong(); this.stopLobbyPreview(); this._stopVoices(this.sfxGain);
+      if (this.ctx) this.ctx.close().catch(() => {});
+      this.ctx = null;
     }
 
     playClearFanfare() {
@@ -703,6 +772,7 @@
           gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.08 + 0.45);
           osc.connect(gain);
           gain.connect(this.sfxGain);
+          this._trackVoice(osc, this.sfxGain, [gain]);
           osc.start(now + i * 0.08);
           osc.stop(now + i * 0.08 + 0.46);
         });

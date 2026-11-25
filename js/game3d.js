@@ -80,6 +80,7 @@
       loader.load(url, loaded => {
         tex.image = loaded.image;
         tex.needsUpdate = true;
+        loaded.dispose();
       }, undefined, () => {});
     }
     return tex;
@@ -135,6 +136,7 @@
       this.isFever = false;
       this.feverRemaining = 0;
       this.lastFrameTime = 0;
+      this.audioOffset = 0; this.inputTimes = {}; this.nextMissIndex = 0; this.visibleStartIndex = 0;
       this.swingToggle = 0;
       this.slashAnimTimer = 0;
 
@@ -224,6 +226,7 @@
         side: THREE.DoubleSide
       });
       const surfMesh = new THREE.Mesh(surfGeo, surfMat);
+      surfMesh.frustumCulled = false;
       group.add(surfMesh);
 
       // Left, Right & 2 Inner Lane Divider Neon Lines
@@ -238,6 +241,7 @@
           opacity: isOuter ? 0.98 : 0.42
         });
         const line = new THREE.Line(lg, lm);
+        line.frustumCulled = false;
         line.userData.ratio = r;
         group.add(line);
         return line;
@@ -424,10 +428,14 @@
     }
 
     // ==================== START / CONTROL LIFECYCLE ====================
-    startSession({ song, difficulty, charId, autoFever = true }) {
+    startSession({ song, difficulty, charId, autoFever = true, audioOffset = 0, vip = false }) {
       this.initThree();
       this._clearNotes();
 
+      this.sessionId = (window.crypto && window.crypto.randomUUID) ? window.crypto.randomUUID() : `${Date.now()}_${Math.random()}`;
+      this.audioOffset = audioOffset;
+      this.vipAura = vip;
+      this.inputTimes = {};
       this.song = song;
       this.difficulty = difficulty;
       this.charSpec = CHAR_SPECS[charId] || CHAR_SPECS.luna;
@@ -437,6 +445,8 @@
       this.approachSpeed = speedMap[difficulty] || 31;
 
       this.chart = window.AudioEngine.generateChart(song, difficulty);
+      this.nextMissIndex = 0;
+      this.visibleStartIndex = 0;
       this.currentLane = 1;
       this.visualLaneX = 0;
       this.chosenBranch = 'none';
@@ -506,13 +516,13 @@
       const prevLane = this.currentLane;
       this.currentLane = Math.max(0, Math.min(2, this.currentLane + dir));
 
-      // Moving left/right right as a matching directional swipe tile crosses Z=0 also slashes it smoothly!
-      const swipeType = dir < 0 ? 'swipeL' : 'swipeR';
-      this._tryStrikeNote(swipeType, true);
+      // Preserve the original assisted directional slash while steering.
+      const struck = this._tryStrikeNote(dir < 0 ? 'swipeL' : 'swipeR', true);
 
       if (this.currentLane !== prevLane) {
         this.runnerGroup.rotation.z = -dir * 0.24;
       }
+      return struck;
     }
 
     triggerTap() {
@@ -524,14 +534,15 @@
     triggerSwipe() {
       if (!this.active || this.paused) return;
       this._swingSticks(true);
-      this._tryStrikeNote('swipeAny', false);
+      return this._tryStrikeNote('swipeAny', false);
     }
 
     activateFever() {
-      if (this.isFever || this.feverGauge < 100) return;
+      if (!this.active || this.paused || this.isFever || this.feverGauge < 100) return;
       this.isFever = true;
       this.feverGauge = 100;
       this.feverRemaining = 8.0 + this.charSpec.feverBonusSec;
+      this.feverEndTime = window.AudioEngine.getSongTime() + this.feverRemaining;
       window.AudioEngine.playFeverTriggerSfx();
       if (this.callbacks.onFeverState) this.callbacks.onFeverState(true);
     }
@@ -556,7 +567,7 @@
     }
 
     _tryStrikeNote(actionType, silentIfNone = false) {
-      const songTime = window.AudioEngine.getSongTime();
+      const songTime = window.AudioEngine.getSongTime() + this.audioOffset;
       const perfWin = 0.095 * this.charSpec.judgeScale;
       const greatWin = 0.165 * this.charSpec.judgeScale;
 
@@ -564,7 +575,7 @@
       let candidate = null;
       let bestDelta = Infinity;
 
-      for (let i = 0; i < this.chart.notes.length; i++) {
+      for (let i = this.nextMissIndex; i < this.chart.notes.length; i++) {
         const n = this.chart.notes[i];
         if (n.hit) continue;
         if (!this._isNoteActiveOnCurrentBranch(n)) continue;
@@ -583,7 +594,7 @@
         if (actionType === 'swipeR' && n.type !== 'swipeR') continue;
         if (silentIfNone && !isSwipeNote) continue;
 
-        // Lane check: exact lane match preferred; adjacent lane auto-assist allowed so fast notes feel snappy!
+        // Preserve the original adjacent-lane assistance.
         const laneDist = Math.abs(n.lane - this.currentLane);
         if (laneDist <= 1) {
           const weighted = dt + laneDist * 0.035;
@@ -601,7 +612,7 @@
         return;
       }
 
-      // Snap runner into note's lane if assisted by 1 lane
+      // Mark exactly one matching note per input.
       this.currentLane = candidate.lane;
       candidate.hit = true;
       const mesh = this.noteMeshes[candidate.id];
@@ -610,6 +621,7 @@
       const rawDt = Math.abs(candidate.time - songTime);
       const grade = (rawDt <= perfWin) ? 'PERFECT' : 'GREAT';
       this._registerJudgment(grade, candidate);
+      return true;
     }
 
     _registerJudgment(grade, note) {
@@ -704,7 +716,7 @@
 
       // 1. Check Fever countdown
       if (this.isFever) {
-        this.feverRemaining -= dt;
+        this.feverRemaining = Math.max(0, this.feverEndTime - songTime);
         this.feverGauge = Math.max(0, (this.feverRemaining / (8.0 + this.charSpec.feverBonusSec)) * 100);
         this.shieldRing.material.opacity = 0.72;
         this.shieldRing.rotation.z += dt * 5;
@@ -728,12 +740,13 @@
           if (this.chosenBranch === 'none') {
             this.chosenBranch = (this.currentLane >= 2) ? 'rush' : 'std';
           }
-        } else if (songTime > branchEnd && this.chosenBranch !== 'none') {
+        } else if (songTime > branchEnd + 2.0 && this.chosenBranch !== 'none') {
           this.chosenBranch = 'none';
         }
       }
 
-      const targetBranchSign = (this.chosenBranch === 'rush') ? 1 : (this.chosenBranch === 'std' ? -1 : 0);
+      const previewSign = this.chart.hasBranch && songTime < this.chart.branchDecision ? (previewRushSelected ? 1 : -1) : 0;
+      const targetBranchSign = (this.chosenBranch === 'rush') ? 1 : (this.chosenBranch === 'std' ? -1 : previewSign);
       const currentSep = this.getBranchSeparation(songTime);
       const targetWorldBranchShift = targetBranchSign * currentSep;
       this.visualBranchOffset += (targetWorldBranchShift - this.visualBranchOffset) * Math.min(1, dt * 8);
@@ -778,9 +791,10 @@
 
       // 4. Update Notes along 3D Curved Track & Detect Misses
       const missWindow = 0.18 * this.charSpec.judgeScale;
+      const judgeTime = songTime + this.audioOffset;
       const visibleLeadSec = 82 / this.approachSpeed;
 
-      for (let i = 0; i < this.chart.notes.length; i++) {
+      for (let i = this.visibleStartIndex; i < this.chart.notes.length; i++) {
         const note = this.chart.notes[i];
         const mesh = this.noteMeshes[i];
         if (note.hit) {
@@ -789,18 +803,20 @@
         }
 
         const timeUntil = note.time - songTime;
-        if (timeUntil < -missWindow) {
+        if (note.time - judgeTime < -missWindow) {
           note.hit = true;
           mesh.visible = false;
           if (this._isNoteActiveOnCurrentBranch(note)) {
             this._registerJudgment('MISS', note);
           }
+          this.nextMissIndex = i + 1;
+          this.visibleStartIndex = i + 1;
           continue;
         }
 
         if (timeUntil > visibleLeadSec) {
           mesh.visible = false;
-          continue;
+          break;
         }
 
         if (note.branch === 'rush_only' && this.chosenBranch === 'std') {
@@ -808,7 +824,7 @@
           continue;
         }
 
-        const zAhead = Math.max(0, timeUntil * this.approachSpeed);
+        const zAhead = timeUntil * this.approachSpeed;
         const base = this.getBaseCurveCenter(songTime, zAhead);
         const sep = this.getBranchSeparation(note.time);
 
@@ -858,7 +874,7 @@
       this.hitLineMesh.material.color.setHex(this.isFever ? 0xffd84d : 0x00f2ff);
 
       if (this.callbacks.onFrameUpdate) {
-        const activeRouteMult = (this.chosenBranch === 'rush') ? this.charSpec.rushBranchMult : 1.0;
+        const activeRouteMult = (this.chosenBranch === 'rush' && songTime <= this.chart.branchEnd) ? this.charSpec.rushBranchMult : 1.0;
         this.callbacks.onFrameUpdate({
           songTime,
           duration: this.song.duration,
@@ -872,6 +888,7 @@
         });
       }
 
+      if (this.vipAura && !this.isFever && !this.shieldLeft) this.shieldRing.material.opacity = .25;
       this.renderer.render(this.scene, this.camera);
 
       // 6. Stage Clear Check
@@ -904,8 +921,26 @@
       this._clearNotes();
     }
 
+    dispose() {
+      this.stop();
+      window.removeEventListener('resize', this._onResize);
+      const geometries = new Set(), materials = new Set(), textures = new Set();
+      if (this.scene) this.scene.traverse(obj => {
+        if (obj.geometry) geometries.add(obj.geometry);
+        const list = Array.isArray(obj.material) ? obj.material : [obj.material];
+        list.filter(Boolean).forEach(mat => { materials.add(mat); if (mat.map) textures.add(mat.map); });
+      });
+      [this.sharedSwipeGeo, this.sharedBurstGeo].filter(Boolean).forEach(g => geometries.add(g));
+      [this.matOrb, this.matSwipeL, this.matSwipeR].filter(Boolean).forEach(m => materials.add(m));
+      [this.texOrb, this.texSwipeL, this.texSwipeR].filter(Boolean).forEach(t => textures.add(t));
+      geometries.forEach(g => g.dispose()); materials.forEach(m => m.dispose()); textures.forEach(t => t.dispose());
+      if (this.renderer) { this.renderer.dispose(); this.renderer.domElement.remove(); }
+      this.renderer = null; this.scene = null;
+    }
+
     finishStage() {
       const stats = {
+        sessionId: this.sessionId,
         song: this.song,
         difficulty: this.difficulty,
         charId: this.charSpec.id,
@@ -917,7 +952,10 @@
       };
       const totalNotes = Math.max(1, stats.perfect + stats.great + stats.miss);
       const accuracy = (stats.perfect + stats.great * 0.7) / totalNotes;
-      stats.rankGrade = (accuracy >= 0.85 && stats.miss <= Math.ceil(totalNotes * 0.08)) ? 'S+' : 'A';
+      stats.accuracy = accuracy;
+      stats.cleared = this.hp > 0 && accuracy >= .65;
+      stats.rankGrade = accuracy >= .85 && stats.miss <= Math.ceil(totalNotes * .08) ? 'S+' : accuracy >= .65 ? 'A' : accuracy >= .40 ? 'B' : accuracy > 0 ? 'C' : 'D';
+      if (!stats.cleared && stats.rankGrade !== 'D') stats.rankGrade = 'C';
 
       this.stop();
       if (this.callbacks.onStageClear) {
