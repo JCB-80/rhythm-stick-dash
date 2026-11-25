@@ -868,8 +868,9 @@
       if (start === undefined || !state.game3D) return;
       const dx = e.clientX - start;
       if (Math.abs(dx) > 42) {
-        const struck = state.game3D.moveLane(dx < 0 ? -1 : 1);
-        if (!struck) state.game3D.triggerSwipe();
+        // Strict directional swipe: dragging left only hits swipeL, dragging right only hits swipeR
+        const dir = dx < 0 ? -1 : 1;
+        state.game3D.moveLane(dir);
       } else state.game3D.triggerTap();
     });
     canvasWrap.addEventListener('pointercancel', e => drags.delete(e.pointerId));
@@ -912,7 +913,13 @@
       } else if (k === ' ' || k === 'j' || k === 'k' || k === 'f') {
         e.preventDefault();
         state.game3D.triggerTap();
-      } else if (k === 'shift' || k === 's' || k === 'l' || k === 'q' || k === 'e' || k === 'arrowup') {
+      } else if (k === 'q') {
+        e.preventDefault();
+        state.game3D.triggerSwipe(-1);
+      } else if (k === 'e') {
+        e.preventDefault();
+        state.game3D.triggerSwipe(1);
+      } else if (k === 'shift' || k === 's' || k === 'l' || k === 'arrowup') {
         e.preventDefault();
         state.game3D.triggerSwipe();
       } else if (k === 'enter' || k === 'v') {

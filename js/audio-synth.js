@@ -637,7 +637,7 @@
       if (!this.isPlaying || !this.ctx) return 0;
       if (this.isPaused) return this.pausedElapsed;
       if (typeof this.resumeAnchorCtxTime === 'number' && this.resumeBaseElapsed > 0) {
-        return Math.max(0, this.resumeBaseElapsed + (this.ctx.currentTime - this.resumeAnchorCtxTime));
+        return Math.max(0, this.resumeBaseElapsed + Math.max(0, this.ctx.currentTime - this.resumeAnchorCtxTime));
       }
       return Math.max(0, this.ctx.currentTime - this.songStartCtxTime);
     }
@@ -659,10 +659,11 @@
       this.ensureContext();
       this.isPaused = false;
       this.resumeBaseElapsed = this.pausedElapsed;
-      this.resumeAnchorCtxTime = this.ctx.currentTime;
       if (this.currentSong && this.currentSong.isCustom && this.currentSong.audioBuffer) {
+        this.resumeAnchorCtxTime = this.ctx.currentTime + 0.04;
         this._startCustomBuffer(this.pausedElapsed);
       } else {
+        this.resumeAnchorCtxTime = this.ctx.currentTime;
         const sixteenthDur = 60 / this.currentSong.bpm / 4;
         this.songStartCtxTime = this.ctx.currentTime - this.pausedElapsed;
         this.nextStepIndex = Math.ceil(this.pausedElapsed / sixteenthDur);

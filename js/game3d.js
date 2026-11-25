@@ -136,7 +136,7 @@
       this.isFever = false;
       this.feverRemaining = 0;
       this.lastFrameTime = 0;
-      this.audioOffset = 0; this.inputTimes = {}; this.nextMissIndex = 0; this.visibleStartIndex = 0;
+      this.audioOffset = 0; this.nextMissIndex = 0; this.visibleStartIndex = 0;
       this.swingToggle = 0;
       this.slashAnimTimer = 0;
 
@@ -436,7 +436,6 @@
       this.sessionId = (window.crypto && window.crypto.randomUUID) ? window.crypto.randomUUID() : `${Date.now()}_${Math.random()}`;
       this.audioOffset = audioOffset;
       this.vipAura = vip;
-      this.inputTimes = {};
       this.song = song;
       this.difficulty = difficulty;
       this.charSpec = CHAR_SPECS[charId] || CHAR_SPECS.luna;
@@ -538,10 +537,11 @@
       this._tryStrikeNote('tap', false);
     }
 
-    triggerSwipe() {
-      if (!this.active || this.paused) return;
+    triggerSwipe(dir = 0) {
+      if (!this.active || this.paused) return false;
       this._swingSticks(true);
-      return this._tryStrikeNote('swipeAny', false);
+      const action = dir < 0 ? 'swipeL' : dir > 0 ? 'swipeR' : 'swipeAny';
+      return this._tryStrikeNote(action, false);
     }
 
     activateFever() {
@@ -601,9 +601,10 @@
         if (actionType === 'swipeR' && n.type !== 'swipeR') continue;
         if (silentIfNone && !isSwipeNote) continue;
 
-        // Preserve the original adjacent-lane assistance.
+        // EASY/NORMAL retain adjacent-lane assistance; HARD/EXTREME enforce strict laneDist === 0.
+        const maxLaneDist = (this.difficulty === 'HARD' || this.difficulty === 'EXTREME') ? 0 : 1;
         const laneDist = Math.abs(n.lane - this.currentLane);
-        if (laneDist <= 1) {
+        if (laneDist <= maxLaneDist) {
           const weighted = dt + laneDist * 0.035;
           if (weighted < bestDelta) {
             bestDelta = weighted;
@@ -820,8 +821,8 @@
           continue;
         }
 
-        const timeUntil = note.time - songTime;
-        if (note.time - judgeTime < -missWindow) {
+        const timeUntil = note.time - judgeTime;
+        if (timeUntil < -missWindow) {
           note.hit = true;
           mesh.visible = false;
           if (this._isNoteActiveOnCurrentBranch(note)) {

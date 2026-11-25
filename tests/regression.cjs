@@ -176,3 +176,42 @@ test('all builtin beatmaps match the original gameplay baseline', () => {
   const charts = c.SONGS.flatMap(song => ['EASY', 'NORMAL', 'HARD', 'EXTREME'].map(diff => c.AudioEngine.generateChart(song, diff)));
   assert.equal(createHash('sha256').update(JSON.stringify(charts)).digest('hex'), '9cb87fe9f57ea81d3604ac208672da2cc807ffe4d44ea0c4f269fb6ea5218aac');
 });
+
+test('custom MP3 resume aligns 40ms buffer anchor without drift or rewind', () => {
+  const { ctx: c } = runtime(), a = c.AudioEngine;
+  const customSong = { id: 'custom_sync', isCustom: true, bpm: 120, duration: 30, audioBuffer: { duration: 30 } };
+  a.startSong(customSong);
+  a.ctx.currentTime = 5.04;
+  assert.ok(Math.abs(a.getSongTime() - 5.0) < 0.001);
+  a.pauseSong();
+  a.ctx.currentTime = 20.0;
+  a.resumeSong();
+  assert.ok(Math.abs(a.resumeAnchorCtxTime - 20.04) < 0.0001, 'resumeAnchorCtxTime includes +0.04s offset');
+  assert.ok(Math.abs(a.getSongTime() - 5.0) < 0.001, 'getSongTime does not rewind during 40ms startup');
+  a.ctx.currentTime = 21.04;
+  assert.ok(Math.abs(a.getSongTime() - 6.0) < 0.001, 'getSongTime stays locked to custom buffer after resume');
+  a.stopSong();
+});
+
+test('HARD/EXTREME enforce strict laneDist===0 and directional swipe rejects opposite direction', () => {
+  const { ctx: c } = runtime();
+  const g = new c.RhythmGame3D(null);
+  g.active = true;
+  g.difficulty = 'HARD';
+  g.currentLane = 1;
+  g.chart = { notes: [{ id: 0, lane: 0, time: 10, type: 'tap', branch: 'main' }] };
+  g.noteMeshes = [{ visible: true }];
+  c.AudioEngine.getSongTime = () => 10;
+  let hits = 0;
+  g._registerJudgment = () => { hits++; };
+  assert.notEqual(g._tryStrikeNote('tap'), true, 'HARD blocks adjacent-lane center-camp hit');
+  assert.equal(hits, 0);
+  g.currentLane = 0;
+  assert.equal(g._tryStrikeNote('tap'), true, 'HARD hits exact lane');
+
+  // Strict directional swipe: swipeL must NOT hit swipeR
+  g.chart.notes = [{ id: 0, lane: 0, time: 10, type: 'swipeR', branch: 'main' }];
+  g.noteMeshes = [{ visible: true }];
+  assert.notEqual(g._tryStrikeNote('swipeL'), true, 'swipeL rejects swipeR note');
+  assert.equal(g._tryStrikeNote('swipeR'), true, 'swipeR hits swipeR note');
+});
