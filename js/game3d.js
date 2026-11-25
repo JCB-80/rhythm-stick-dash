@@ -272,6 +272,19 @@
       this.hitLineMesh.renderOrder = 3;
       this.hitLineMesh.position.set(0, 0.05, 0);
       this.scene.add(this.hitLineMesh);
+
+      // Give each lane its own strike target, visible against both route colors.
+      const socketGeo = new THREE.RingGeometry(0.38, 0.57, 4);
+      const socketMat = new THREE.MeshBasicMaterial({
+        color: 0xf1faff, side: THREE.DoubleSide, depthWrite: false
+      });
+      for (const laneX of [-2.15, 0, 2.15]) {
+        const socket = new THREE.Mesh(socketGeo, socketMat);
+        socket.rotation.x = -Math.PI / 2;
+        socket.position.set(laneX, 0.11, 0);
+        socket.renderOrder = 4;
+        this.scene.add(socket);
+      }
     }
 
     _buildCityEqualizers() {

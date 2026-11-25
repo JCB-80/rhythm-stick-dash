@@ -16,6 +16,14 @@ const server = http.createServer((req, res) => {
   const browser = await chromium.launch({ headless: true, executablePath: process.env.RSD_BROWSER_EXECUTABLE || undefined, args: process.env.RSD_BROWSER_ARGS ? JSON.parse(process.env.RSD_BROWSER_ARGS) : ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-dev-shm-usage'] });
   try {
     const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+    const base = `http://127.0.0.1:${server.address().port}`;
+    await page.goto(base + '/privacy-policy.html');
+    await page.evaluate(async () => {
+      const legacy = await caches.open('rhythm-stick-dash-v6');
+      await legacy.put('./style.css', new Response('old game style'));
+      await legacy.put('./neighbor/style.css', new Response('neighbor style'));
+      await caches.open('neighbor-cache');
+    });
     const errors = []; page.on('pageerror', err => errors.push(err.message));
     // Intentionally block the CDN: this verifies the checked-in r128 fallback.
     await page.route('https://cdnjs.cloudflare.com/**', route => route.abort());
@@ -111,6 +119,20 @@ const server = http.createServer((req, res) => {
     assert.deepEqual(deniedErrors, []); assert.equal(await denied.evaluate(() => GameStorage.persistent), false);
     console.log('PASS: CDN fallback; six viewport widths; five locales; pause/resume; mobile fever; single gesture judgment; 20 retries; result/ranking/retry; corrupt audio + real WAV decoding; blocked storage.');
     console.log('Renderer resources:', JSON.stringify(memory));
+    await page.evaluate(() => navigator.serviceWorker.ready);
+    await page.waitForFunction(() => navigator.serviceWorker.controller !== null);
+    const migration = await page.evaluate(async () => {
+      const legacy = await caches.open('rhythm-stick-dash-v6');
+      return {
+        oldStyle: Boolean(await legacy.match('./style.css')),
+        neighborStyle: await (await legacy.match('./neighbor/style.css')).text(),
+        neighborCache: await caches.has('neighbor-cache')
+      };
+    });
+    assert.deepEqual(migration, { oldStyle: false, neighborStyle: 'neighbor style', neighborCache: true });
+    await page.context().setOffline(true);
+    const offlineStyle = await page.evaluate(() => fetch('./style.css').then(r => r.text()));
+    assert.equal(offlineStyle, fs.readFileSync(path.join(root, 'style.css'), 'utf8'));
     await page.close(); await denied.close();
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; }).finally(() => server.close());

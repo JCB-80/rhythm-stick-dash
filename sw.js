@@ -1,5 +1,6 @@
 // Offline-capable Service Worker for PWA & TWA Store packaging
-const CACHE_NAME = 'rhythm-stick-dash-v6';
+const CACHE_PREFIX = `rhythm-stick-dash:${self.registration.scope}:`;
+const CACHE_NAME = CACHE_PREFIX + 'v7';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -51,16 +52,23 @@ self.addEventListener('install', event => {
 });
 
 self.addEventListener('activate', event => {
-  event.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
-    ).then(() => self.clients.claim())
-  );
+  event.waitUntil((async () => {
+    const keys = await caches.keys();
+    await Promise.all(keys.filter(key => key.startsWith(CACHE_PREFIX) && key !== CACHE_NAME)
+      .map(key => caches.delete(key)));
+    // v6 shared its cache name across installs. Remove only this game's scoped URLs.
+    if (keys.includes('rhythm-stick-dash-v6')) {
+      const legacy = await caches.open('rhythm-stick-dash-v6');
+      await Promise.all(CORE_ASSETS.map(path => legacy.delete(new URL(path, self.registration.scope))));
+      if ((await legacy.keys()).length === 0) await caches.delete('rhythm-stick-dash-v6');
+    }
+    await self.clients.claim();
+  })());
 });
 
 self.addEventListener('fetch', event => {
-  if (event.request.method !== 'GET') return;
+  if (event.request.method !== 'GET' || !event.request.url.startsWith(self.registration.scope)) return;
   event.respondWith(
-    caches.match(event.request).then(cached => cached || fetch(event.request))
+    caches.open(CACHE_NAME).then(cache => cache.match(event.request)).then(cached => cached || fetch(event.request))
   );
 });
