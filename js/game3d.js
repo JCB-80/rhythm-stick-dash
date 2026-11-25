@@ -201,6 +201,9 @@
       const w = this.container.clientWidth || window.innerWidth;
       const h = this.container.clientHeight || window.innerHeight;
       this.camera.aspect = w / h;
+      // Leave room for both outer targets even when the camera follows a side lane.
+      const halfAngle = this.camera.fov * Math.PI / 360;
+      this.camera.position.z = Math.max(7.6, 3.7 / (this.camera.aspect * Math.tan(halfAngle)));
       this.camera.updateProjectionMatrix();
       this.renderer.setSize(w, h);
     }
@@ -276,7 +279,7 @@
       // Give each lane its own strike target, visible against both route colors.
       const socketGeo = new THREE.RingGeometry(0.38, 0.57, 4);
       const socketMat = new THREE.MeshBasicMaterial({
-        color: 0xf1faff, side: THREE.DoubleSide, depthWrite: false
+        color: 0xf1faff, side: THREE.DoubleSide, transparent: true, depthWrite: false
       });
       for (const laneX of [-2.15, 0, 2.15]) {
         const socket = new THREE.Mesh(socketGeo, socketMat);

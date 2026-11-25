@@ -49,6 +49,24 @@ const server = http.createServer((req, res) => {
     });
     await page.locator('#btn-start-run').click(); await page.waitForSelector('#scene-game.active canvas');
     await page.waitForTimeout(150);
+    for (const width of [320, 390]) {
+      await page.setViewportSize({ width, height: 844 });
+      const targetsVisible = await page.evaluate(() => {
+        testGame._onResize();
+        const camera = testGame.camera.clone();
+        for (const laneX of [-2.15, 0, 2.15]) {
+          camera.position.x = laneX * 0.35;
+          camera.lookAt(laneX * 0.25, 1.3, -18);
+          camera.updateMatrixWorld();
+          for (const edge of [-2.72, 2.72]) {
+            const projected = new THREE.Vector3(edge, 0.11, 0).project(camera);
+            if (Math.abs(projected.x) >= 1 || Math.abs(projected.y) >= 1) return false;
+          }
+        }
+        return true;
+      });
+      assert.ok(targetsVisible, `outer strike targets fit while following every lane at ${width}px`);
+    }
     const hudBounds = await page.locator('.hud-score-box').boundingBox(); assert.ok(hudBounds.x + hudBounds.width <= 391);
     await page.locator('#btn-game-pause').click();
     const pausedAt = await page.evaluate(() => AudioEngine.getSongTime());

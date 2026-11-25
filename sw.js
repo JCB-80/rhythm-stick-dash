@@ -1,6 +1,6 @@
 // Offline-capable Service Worker for PWA & TWA Store packaging
 const CACHE_PREFIX = `rhythm-stick-dash:${self.registration.scope}:`;
-const CACHE_NAME = CACHE_PREFIX + 'v7';
+const CACHE_NAME = CACHE_PREFIX + 'v8';
 const CORE_ASSETS = [
   './',
   './index.html',
