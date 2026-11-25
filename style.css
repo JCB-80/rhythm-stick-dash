@@ -601,6 +601,7 @@ html, body {
   border-left: 3px solid var(--cyan);
   padding: 4px 8px;
   border-radius: 4px;
+  overflow-wrap: anywhere;
 }
 
 .character-bottom-bar {
@@ -1851,8 +1852,11 @@ button:disabled { opacity: .5; cursor: default; }
   .scene-header-title { font-size: 22px; }
   .user-profile-chip { flex-wrap: wrap; max-width: 100%; }
   .character-cards-grid { grid-template-columns: 1fr; flex: none; gap: 16px; }
-  .runner-card { min-width: 0; }
-  .runner-art-wrap { flex: none; height: 190px; }
+  .runner-card { min-width: 0; display: grid; grid-template-columns: 34% minmax(0, 1fr); }
+  .runner-art-wrap { min-height: 100%; height: auto; }
+  .runner-info-body { min-width: 0; padding: 10px; border-top: 0; border-left: 1px solid rgba(255, 255, 255, 0.12); }
+  .runner-stat-bars { grid-template-columns: 1fr; }
+  .runner-card.active.theme-cyan, .runner-card.active.theme-magenta, .runner-card.active.theme-gold { transform: none; }
   .runner-title-row { flex-wrap: wrap; gap: 4px; }
   .character-bottom-bar { flex-direction: column; gap: 10px; }
   .login-layout { height: auto; margin: auto; min-width: 0; }

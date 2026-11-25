@@ -269,6 +269,9 @@
       const isSelected = (c.id === state.selectedChar);
       const card = document.createElement('div');
       card.className = `runner-card ${c.theme} ${isSelected ? 'active' : ''}`;
+      card.setAttribute('role', 'button');
+      card.setAttribute('tabindex', '0');
+      card.setAttribute('aria-pressed', String(isSelected));
       card.innerHTML = `
         <div class="runner-art-wrap">
           <img src="${c.img}" alt="${c.id}" />
@@ -297,6 +300,13 @@
         state.selectedChar = c.id;
         window.AuthService.updateUser({ selectedChar: c.id });
         renderCharacterSelect();
+      });
+      card.addEventListener('keydown', event => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          card.click();
+          grid.children[CHARACTER_LIST.findIndex(item => item.id === c.id)]?.focus();
+        }
       });
 
       grid.appendChild(card);
