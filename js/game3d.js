@@ -458,9 +458,18 @@
       this.autoFever = autoFever;
 
       const speedMap = { EASY: 25, NORMAL: 31, HARD: 38, EXTREME: 45 };
-      this.approachSpeed = speedMap[difficulty] || 31;
+      const mods = (window.Wave2LiveOps && window.Wave2LiveOps.state.activeModifiers) || {};
+      this.approachSpeed = (speedMap[difficulty] || 31) * (mods.SPEED_125 ? 1.25 : 1.0);
+      this.hiddenMode = !!mods.HIDDEN;
 
       this.chart = window.AudioEngine.generateChart(song, difficulty);
+      if (mods.MIRROR && this.chart && Array.isArray(this.chart.notes)) {
+        this.chart.notes = this.chart.notes.map(n => ({
+          ...n,
+          lane: 2 - n.lane,
+          type: n.type === 'swipeL' ? 'swipeR' : (n.type === 'swipeR' ? 'swipeL' : n.type)
+        }));
+      }
       this.nextMissIndex = 0;
       this.visibleStartIndex = 0;
       this.currentLane = 1;

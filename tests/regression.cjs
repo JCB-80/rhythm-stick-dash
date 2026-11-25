@@ -131,6 +131,20 @@ test('P1 fixes: HUD CSS selectors match DOM IDs and moveLane swings sticks on sw
   assert.equal(g.moveLane(1), true);
   assert.equal(swung, true);
 });
+test('Wave 2: Challenge Modifiers (MIRROR/HIDDEN/SPEED_125), 7-day attendance, and Ghost LeaderboardProvider work', async () => {
+  const { ctx: c } = runtime();
+  vm.runInContext(fs.readFileSync(path.join(root, 'js/liveops.js'), 'utf8'), c, { filename: 'js/liveops.js' });
+  const lo = c.Wave2LiveOps;
+  assert.equal(lo.CHALLENGE_MODIFIERS.length, 3);
+  assert.equal(lo.toggleModifier('MIRROR'), true);
+  assert.equal(lo.toggleModifier('SPEED_125'), true);
+  const bonus = lo.getModifierBonus();
+  assert.equal(bonus.scorePct, 40);
+  assert.equal(lo.claimAttendance().ok, true);
+  assert.equal(lo.claimAttendance().ok, false);
+  const board = await lo.leaderboardProvider.fetchWeeklyBoard(750000, 'GhostDash');
+  assert.ok(board.some(r => r.isMe && r.tier.id === 'diamond'));
+});
 function renderStub(c) {
   const g = new c.RhythmGame3D(null), color = { setHex() {} };
   g.active = true; g.song = { bpm: 132, duration: 1000 };

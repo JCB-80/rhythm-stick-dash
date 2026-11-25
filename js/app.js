@@ -837,6 +837,46 @@
       });
     }
 
+    // Wave 2: Challenge Modifiers (MIRROR / HIDDEN / SPEED 1.25x) & Live-Ops
+    const lo = window.Wave2LiveOps;
+    if (lo) {
+      const grantRsd = (r) => {
+        const u = window.AuthService.getCurrentUser();
+        if (!u) return;
+        window.AuthService.updateUser({ coins: (u.coins || 0) + (r.coins || 0), cores: (u.cores || 0) + (r.cores || 0) });
+        if (state.currentScene === 'scene-lobby') renderLobby();
+      };
+      const syncModButtons = () => {
+        document.querySelectorAll('#w2-modifiers-bar [data-mod]').forEach(btn => {
+          const on = !!lo.state.activeModifiers[btn.dataset.mod];
+          btn.style.boxShadow = on ? '0 0 12px rgba(56,189,248,0.75)' : 'none';
+          btn.style.borderWidth = on ? '2px' : '1px';
+        });
+      };
+      syncModButtons();
+      document.querySelectorAll('#w2-modifiers-bar [data-mod]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          window.AudioEngine.playUiClick();
+          const on = lo.toggleModifier(btn.dataset.mod);
+          syncModButtons();
+          const b = lo.getModifierBonus();
+          showToast(`${btn.dataset.mod} ${on ? 'ON' : 'OFF'} (점수 +${b.scorePct}% · 코인 +${b.coinPct}%)`);
+        });
+      });
+      if ($('btn-rsd-checkin')) $('btn-rsd-checkin').addEventListener('click', () => {
+        const r = lo.claimAttendance(grantRsd);
+        showToast(r.ok ? `📅 DAY ${r.day} 출석 완료! (${r.reward.label})` : '오늘 출석 보상을 이미 수령했습니다.');
+      });
+      if ($('btn-rsd-missions')) $('btn-rsd-missions').addEventListener('click', () => {
+        const r = lo.claimAllMissions(grantRsd);
+        showToast(r.ok ? `📋 일일 미션 ${r.count}건 수령 (+${r.coins}🪙 / +${r.cores}⚡)` : '수령 가능한 완료 미션이 없습니다.');
+      });
+      if ($('btn-rsd-starter2x')) $('btn-rsd-starter2x').addEventListener('click', () => {
+        const r = lo.claimFirstPurchaseStarter(grantRsd);
+        showToast(r.ok ? '⚡ ₩1,200 첫 결제 2배 스타터 지급 (+2,400🪙 / +40⚡)!' : '이미 1회 한정 스타터 팩을 수령했습니다.');
+      });
+    }
+
     $('btn-open-settings').addEventListener('click', () => {
       window.AudioEngine.playUiClick();
       openSettingsModal(false);
