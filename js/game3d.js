@@ -60,16 +60,29 @@
     const c = document.createElement('canvas');
     c.width = 256; c.height = 128;
     const g = c.getContext('2d');
-    g.fillStyle = 'rgba(14, 24, 48, 0.9)';
+    const isLeft = dir === 'left';
+    const grad = g.createLinearGradient(0, 0, 256, 0);
+    if (isLeft) {
+      grad.addColorStop(0, 'rgba(0, 242, 255, 0.95)');
+      grad.addColorStop(1, 'rgba(8, 36, 72, 0.92)');
+    } else {
+      grad.addColorStop(0, 'rgba(72, 14, 48, 0.92)');
+      grad.addColorStop(1, 'rgba(255, 74, 150, 0.96)');
+    }
+    g.fillStyle = grad;
+    g.fillRect(10, 14, 236, 100);
     g.strokeStyle = colorHex;
     g.lineWidth = 10;
-    g.strokeRect(12, 16, 232, 96);
-    g.fillRect(12, 16, 232, 96);
-    g.fillStyle = '#ffffff';
-    g.font = '900 56px sans-serif';
+    g.strokeRect(10, 14, 236, 100);
+    g.strokeStyle = '#070b14';
+    g.lineWidth = 12;
+    g.font = '900 66px sans-serif';
     g.textAlign = 'center';
     g.textBaseline = 'middle';
-    g.fillText(dir === 'left' ? '<<<' : '>>>', 128, 66);
+    const label = isLeft ? '<<<' : '>>>';
+    g.strokeText(label, 128, 66);
+    g.fillStyle = '#ffffff';
+    g.fillText(label, 128, 66);
     return new THREE.CanvasTexture(c);
   }
 
@@ -183,11 +196,11 @@
 
       // Shared reusable geometries & materials to prevent WebGL GPU memory leaks across retries
       // depthWrite: false prevents transparent sprite quads from punching rectangular holes in translucent track ribbons!
-      this.sharedSwipeGeo = new THREE.PlaneGeometry(2.05, 1.55);
+      this.sharedSwipeGeo = new THREE.PlaneGeometry(2.25, 1.65);
       this.sharedBurstGeo = new THREE.RingGeometry(0.35, 1.25, 24);
       this.matOrb = new THREE.SpriteMaterial({ map: this.texOrb, transparent: true, depthWrite: false });
-      this.matSwipeL = new THREE.MeshBasicMaterial({ map: this.texSwipeL, transparent: true, depthWrite: false, side: THREE.DoubleSide });
-      this.matSwipeR = new THREE.MeshBasicMaterial({ map: this.texSwipeR, transparent: true, depthWrite: false, side: THREE.DoubleSide });
+      this.matSwipeL = new THREE.MeshBasicMaterial({ map: this.texSwipeL, color: 0xb8fcff, transparent: true, depthWrite: false, side: THREE.DoubleSide });
+      this.matSwipeR = new THREE.MeshBasicMaterial({ map: this.texSwipeR, color: 0xffa6d8, transparent: true, depthWrite: false, side: THREE.DoubleSide });
 
       this._buildTrackRibbons();
       this._buildCityEqualizers();
@@ -276,17 +289,20 @@
       this.hitLineMesh.position.set(0, 0.05, 0);
       this.scene.add(this.hitLineMesh);
 
-      // Give each lane its own strike target, visible against both route colors.
-      const socketGeo = new THREE.RingGeometry(0.38, 0.57, 4);
+      // Give each lane its own strike target, visible against both route colors, synced with Fever & hit pulse.
+      const socketGeo = new THREE.RingGeometry(0.38, 0.59, 4);
       const socketMat = new THREE.MeshBasicMaterial({
         color: 0xf1faff, side: THREE.DoubleSide, transparent: true, depthWrite: false
       });
+      this.laneSockets = [];
+      this.lanePulse = [0, 0, 0];
       for (const laneX of [-2.15, 0, 2.15]) {
         const socket = new THREE.Mesh(socketGeo, socketMat);
         socket.rotation.x = -Math.PI / 2;
         socket.position.set(laneX, 0.11, 0);
         socket.renderOrder = 4;
         this.scene.add(socket);
+        this.laneSockets.push(socket);
       }
     }
 
@@ -622,6 +638,9 @@
 
       // Mark exactly one matching note per input.
       this.currentLane = candidate.lane;
+      if (this.lanePulse && candidate.lane >= 0 && candidate.lane <= 2) {
+        this.lanePulse[candidate.lane] = 1.0;
+      }
       candidate.hit = true;
       const mesh = this.noteMeshes[candidate.id];
       if (mesh) mesh.visible = false;
@@ -891,6 +910,17 @@
       });
 
       this.hitLineMesh.material.color.setHex(this.isFever ? 0xffd84d : 0x00f2ff);
+      if (this.laneSockets && this.laneSockets.length) {
+        this.laneSockets[0].material.color.setHex(this.isFever ? 0xffd84d : 0xf1faff);
+        for (let i = 0; i < this.laneSockets.length; i++) {
+          if (this.lanePulse && this.lanePulse[i] > 0) {
+            this.lanePulse[i] = Math.max(0, this.lanePulse[i] - dt * 6.5);
+          }
+          const p = this.lanePulse ? this.lanePulse[i] : 0;
+          const sc = 1 + 0.35 * p;
+          this.laneSockets[i].scale.set(sc, sc, 1);
+        }
+      }
 
       if (this.callbacks.onFrameUpdate) {
         const activeRouteMult = (this.chosenBranch === 'rush' && songTime <= this.chart.branchEnd) ? this.charSpec.rushBranchMult : 1.0;
