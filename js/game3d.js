@@ -182,11 +182,12 @@
       this.texSwipeR = loadSafeTexture('./assets/sprites_transparent/note_swipe_magenta.png', () => makeSwipeFallbackTexture('right', '#ff2bd6'));
 
       // Shared reusable geometries & materials to prevent WebGL GPU memory leaks across retries
+      // depthWrite: false prevents transparent sprite quads from punching rectangular holes in translucent track ribbons!
       this.sharedSwipeGeo = new THREE.PlaneGeometry(2.05, 1.55);
-      this.sharedBurstGeo = new THREE.RingGeometry(0.35, 1.25, 20);
-      this.matOrb = new THREE.SpriteMaterial({ map: this.texOrb, transparent: true });
-      this.matSwipeL = new THREE.MeshBasicMaterial({ map: this.texSwipeL, transparent: true, side: THREE.DoubleSide });
-      this.matSwipeR = new THREE.MeshBasicMaterial({ map: this.texSwipeR, transparent: true, side: THREE.DoubleSide });
+      this.sharedBurstGeo = new THREE.RingGeometry(0.35, 1.25, 24);
+      this.matOrb = new THREE.SpriteMaterial({ map: this.texOrb, transparent: true, depthWrite: false });
+      this.matSwipeL = new THREE.MeshBasicMaterial({ map: this.texSwipeL, transparent: true, depthWrite: false, side: THREE.DoubleSide });
+      this.matSwipeR = new THREE.MeshBasicMaterial({ map: this.texSwipeR, transparent: true, depthWrite: false, side: THREE.DoubleSide });
 
       this._buildTrackRibbons();
       this._buildCityEqualizers();
@@ -222,11 +223,13 @@
       const surfMat = new THREE.MeshBasicMaterial({
         color: surfaceColorHex,
         transparent: true,
-        opacity: 0.78,
+        opacity: 0.82,
+        depthWrite: false,
         side: THREE.DoubleSide
       });
       const surfMesh = new THREE.Mesh(surfGeo, surfMat);
       surfMesh.frustumCulled = false;
+      surfMesh.renderOrder = 1;
       group.add(surfMesh);
 
       // Left, Right & 2 Inner Lane Divider Neon Lines
@@ -238,10 +241,12 @@
         const lm = new THREE.LineBasicMaterial({
           color: isOuter ? edgeColorHex : 0x5be8ff,
           transparent: true,
-          opacity: isOuter ? 0.98 : 0.42
+          opacity: isOuter ? 0.98 : 0.45,
+          depthWrite: false
         });
         const line = new THREE.Line(lg, lm);
         line.frustumCulled = false;
+        line.renderOrder = 2;
         line.userData.ratio = r;
         group.add(line);
         return line;
@@ -262,8 +267,9 @@
 
       // Glowing Strike Receptor Bar at Z = 0
       const hitGeo = new THREE.BoxGeometry(6.9, 0.08, 0.36);
-      const hitMat = new THREE.MeshBasicMaterial({ color: 0x00f2ff, transparent: true, opacity: 0.88 });
+      const hitMat = new THREE.MeshBasicMaterial({ color: 0x00f2ff, transparent: true, opacity: 0.9, depthWrite: false });
       this.hitLineMesh = new THREE.Mesh(hitGeo, hitMat);
+      this.hitLineMesh.renderOrder = 3;
       this.hitLineMesh.position.set(0, 0.05, 0);
       this.scene.add(this.hitLineMesh);
     }
@@ -291,69 +297,155 @@
     _buildRunnerModel() {
       this.runnerGroup = new THREE.Group();
       this.runnerGroup.position.set(0, 0.08, 0.65);
+      this.runnerGroup.renderOrder = 6;
 
-      const jacketMat = new THREE.MeshStandardMaterial({ color: 0x1b1638, roughness: 0.35, metalness: 0.6 });
+      const darkSuitMat = new THREE.MeshStandardMaterial({ color: 0x120f29, roughness: 0.32, metalness: 0.72 });
+      const jacketMat = new THREE.MeshStandardMaterial({ color: 0x211b47, roughness: 0.28, metalness: 0.65 });
+      const whiteCoreMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+      const cyanGlowMat = new THREE.MeshBasicMaterial({ color: 0x00f2ff });
       const neonTrimMat = new THREE.MeshBasicMaterial({ color: 0xff2bd6 });
       this.runnerTrimMat = neonTrimMat;
 
-      // Torso
-      const torso = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.88, 0.38), jacketMat);
-      torso.position.y = 1.25;
-      this.runnerGroup.add(torso);
+      // Ground Hover Shadow / Skate Pulse Disc
+      const groundDisc = new THREE.Mesh(
+        new THREE.RingGeometry(0.28, 0.72, 24),
+        new THREE.MeshBasicMaterial({ color: 0x00f2ff, transparent: true, opacity: 0.38, depthWrite: false, side: THREE.DoubleSide })
+      );
+      groundDisc.rotation.x = -Math.PI * 0.5;
+      groundDisc.position.y = 0.02;
+      groundDisc.renderOrder = 3;
+      this.runnerGroup.add(groundDisc);
 
-      // Neon Back Emblem
-      const backEmblem = new THREE.Mesh(new THREE.PlaneGeometry(0.36, 0.36), neonTrimMat);
-      backEmblem.position.set(0, 1.32, 0.2);
-      this.runnerGroup.add(backEmblem);
+      // Sculpted V-Taper Cyber Jacket & Waist
+      const waist = new THREE.Mesh(new THREE.CylinderGeometry(0.23, 0.20, 0.36, 10), darkSuitMat);
+      waist.position.y = 0.98;
+      this.runnerGroup.add(waist);
 
-      // Head + Cyber Hair Glow
-      const head = new THREE.Mesh(new THREE.SphereGeometry(0.28, 16, 16), neonTrimMat);
-      head.position.set(0, 1.94, 0);
-      this.runnerGroup.add(head);
+      const chest = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.25, 0.56, 10), jacketMat);
+      chest.position.y = 1.38;
+      chest.scale.set(1.12, 1, 0.72);
+      this.runnerGroup.add(chest);
 
-      // Legs
-      this.leftLeg = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.75, 0.24), jacketMat);
-      this.leftLeg.position.set(-0.18, 0.48, 0);
-      this.rightLeg = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.75, 0.24), jacketMat);
-      this.rightLeg.position.set(0.18, 0.48, 0);
+      // Popped Cyber Collar & Shoulder Pauldrons
+      const collar = new THREE.Mesh(new THREE.TorusGeometry(0.26, 0.045, 8, 18, Math.PI * 1.25), neonTrimMat);
+      collar.rotation.x = Math.PI * 0.55;
+      collar.rotation.z = -Math.PI * 0.12;
+      collar.position.set(0, 1.68, 0.04);
+      this.runnerGroup.add(collar);
+
+      const lPauldron = new THREE.Mesh(new THREE.OctahedronGeometry(0.16, 0), neonTrimMat);
+      lPauldron.position.set(-0.42, 1.58, 0);
+      lPauldron.scale.set(1.2, 0.65, 0.9);
+      const rPauldron = lPauldron.clone();
+      rPauldron.position.x = 0.42;
+      this.runnerGroup.add(lPauldron, rPauldron);
+
+      // Holographic Equalizer Crest on Back
+      const backCrest = new THREE.Mesh(new THREE.OctahedronGeometry(0.18, 0), cyanGlowMat);
+      backCrest.position.set(0, 1.38, 0.21);
+      backCrest.scale.set(0.95, 1.35, 0.25);
+      this.runnerGroup.add(backCrest);
+
+      // Sleek Cyber Helmet / Hair Crown + Twin Flowing Neon Hair/Scarf Ribbons
+      const headCore = new THREE.Mesh(new THREE.SphereGeometry(0.25, 16, 16), darkSuitMat);
+      headCore.position.set(0, 1.92, 0);
+      this.runnerGroup.add(headCore);
+
+      const hairCrown = new THREE.Mesh(new THREE.SphereGeometry(0.265, 14, 14), neonTrimMat);
+      hairCrown.position.set(0, 1.96, 0.03);
+      hairCrown.scale.set(1.02, 0.92, 1.05);
+      this.runnerGroup.add(hairCrown);
+
+      this.hairRibbonL = new THREE.Mesh(new THREE.ConeGeometry(0.085, 0.68, 8), neonTrimMat);
+      this.hairRibbonL.position.set(-0.16, 1.72, 0.24);
+      this.hairRibbonL.rotation.x = 0.48;
+      this.hairRibbonL.rotation.z = -0.18;
+
+      this.hairRibbonR = new THREE.Mesh(new THREE.ConeGeometry(0.085, 0.68, 8), cyanGlowMat);
+      this.hairRibbonR.position.set(0.16, 1.72, 0.24);
+      this.hairRibbonR.rotation.x = 0.48;
+      this.hairRibbonR.rotation.z = 0.18;
+      this.runnerGroup.add(this.hairRibbonL, this.hairRibbonR);
+
+      // Articulated Legs + Neon Shin Guards + Plasma Jet-Skates
+      const buildLeg = (xPos) => {
+        const legGroup = new THREE.Group();
+        legGroup.position.set(xPos, 0.82, 0);
+
+        const thigh = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.09, 0.42, 8), darkSuitMat);
+        thigh.position.y = -0.18;
+        legGroup.add(thigh);
+
+        const shin = new THREE.Mesh(new THREE.CylinderGeometry(0.095, 0.08, 0.42, 8), jacketMat);
+        shin.position.y = -0.52;
+        legGroup.add(shin);
+
+        const shinStripe = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.34, 0.04), neonTrimMat);
+        shinStripe.position.set(0, -0.52, 0.09);
+        legGroup.add(shinStripe);
+
+        const thruster = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.44, 8), cyanGlowMat);
+        thruster.rotation.x = Math.PI * 0.52;
+        thruster.position.set(0, -0.72, 0.22);
+        legGroup.add(thruster);
+
+        return legGroup;
+      };
+
+      this.leftLeg = buildLeg(-0.19);
+      this.rightLeg = buildLeg(0.19);
       this.runnerGroup.add(this.leftLeg, this.rightLeg);
 
-      // Jet-Boot Thrusters
-      const bootMat = new THREE.MeshBasicMaterial({ color: 0x00f2ff });
-      const lBoot = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.45, 8), bootMat);
-      lBoot.rotation.x = Math.PI * 0.5;
-      lBoot.position.set(0, -0.32, 0.22);
-      this.leftLeg.add(lBoot);
+      // Dual-Core Plasma Rhythm Sticks / Sonic Blades (White-hot core + Neon outer sheath)
+      this.stickMat = new THREE.MeshBasicMaterial({ color: 0xff2bd6, transparent: true, opacity: 0.72, depthWrite: false });
+      const buildSaberArm = (side) => {
+        const pivot = new THREE.Group();
+        pivot.position.set(side * 0.42, 1.54, 0);
 
-      const rBoot = lBoot.clone();
-      this.rightLeg.add(rBoot);
+        const armMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.065, 0.46, 8), jacketMat);
+        armMesh.position.set(side * 0.12, -0.12, -0.14);
+        armMesh.rotation.x = Math.PI * 0.25;
+        armMesh.rotation.z = -side * 0.28;
+        pivot.add(armMesh);
 
-      // Left & Right Twin Rhythm Sticks / Sonic Blades
-      this.stickMat = new THREE.MeshBasicMaterial({ color: 0xff2bd6 });
-      this.leftArmPivot = new THREE.Group();
-      this.leftArmPivot.position.set(-0.44, 1.5, 0);
-      const lStick = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 1.55, 10), this.stickMat);
-      lStick.position.set(-0.22, 0.25, -0.45);
-      lStick.rotation.x = Math.PI * 0.36;
-      lStick.rotation.z = 0.35;
-      this.leftArmPivot.add(lStick);
+        const saberGroup = new THREE.Group();
+        saberGroup.position.set(side * 0.24, 0.18, -0.48);
+        saberGroup.rotation.x = Math.PI * 0.34;
+        saberGroup.rotation.z = -side * 0.32;
 
-      this.rightArmPivot = new THREE.Group();
-      this.rightArmPivot.position.set(0.44, 1.5, 0);
-      const rStick = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 1.55, 10), this.stickMat);
-      rStick.position.set(0.22, 0.25, -0.45);
-      rStick.rotation.x = Math.PI * 0.36;
-      rStick.rotation.z = -0.35;
-      this.rightArmPivot.add(rStick);
+        const hilt = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.26, 8), darkSuitMat);
+        hilt.position.y = -0.68;
+        saberGroup.add(hilt);
 
+        const guard = new THREE.Mesh(new THREE.TorusGeometry(0.09, 0.022, 6, 12), cyanGlowMat);
+        guard.rotation.x = Math.PI * 0.5;
+        guard.position.y = -0.54;
+        saberGroup.add(guard);
+
+        const innerCore = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.032, 1.48, 8), whiteCoreMat);
+        innerCore.position.y = 0.22;
+        saberGroup.add(innerCore);
+
+        const outerGlow = new THREE.Mesh(new THREE.CylinderGeometry(0.058, 0.072, 1.54, 10), this.stickMat);
+        outerGlow.position.y = 0.24;
+        outerGlow.renderOrder = 7;
+        saberGroup.add(outerGlow);
+
+        pivot.add(saberGroup);
+        return pivot;
+      };
+
+      this.leftArmPivot = buildSaberArm(-1);
+      this.rightArmPivot = buildSaberArm(1);
       this.runnerGroup.add(this.leftArmPivot, this.rightArmPivot);
 
       // Kai Sound Shield Ring / Fever Aura Ring
-      const ringGeo = new THREE.TorusGeometry(0.95, 0.04, 10, 32);
-      const ringMat = new THREE.MeshBasicMaterial({ color: 0x00f2ff, transparent: true, opacity: 0.0 });
+      const ringGeo = new THREE.TorusGeometry(0.95, 0.045, 10, 32);
+      const ringMat = new THREE.MeshBasicMaterial({ color: 0x00f2ff, transparent: true, opacity: 0.0, depthWrite: false });
       this.shieldRing = new THREE.Mesh(ringGeo, ringMat);
       this.shieldRing.rotation.x = Math.PI * 0.5;
       this.shieldRing.position.y = 1.05;
+      this.shieldRing.renderOrder = 7;
       this.runnerGroup.add(this.shieldRing);
 
       this.scene.add(this.runnerGroup);
@@ -494,6 +586,7 @@
           mesh.rotation.x = -Math.PI * 0.42;
         }
         mesh.visible = false;
+        mesh.renderOrder = 4;
         mesh.userData = { note };
         this.scene.add(mesh);
         return mesh;
@@ -692,10 +785,11 @@
     }
 
     _spawnHitBurst(x, hexColor) {
-      const mat = new THREE.MeshBasicMaterial({ color: hexColor, transparent: true, opacity: 0.92, side: THREE.DoubleSide });
+      const mat = new THREE.MeshBasicMaterial({ color: hexColor, transparent: true, opacity: 0.92, depthWrite: false, side: THREE.DoubleSide });
       const ring = new THREE.Mesh(this.sharedBurstGeo, mat);
       ring.rotation.x = -Math.PI * 0.45;
       ring.position.set(x, 0.25, 0);
+      ring.renderOrder = 5;
       ring.userData = { life: 0.28 };
       this.scene.add(ring);
       this.hitBursts.push(ring);
@@ -777,6 +871,10 @@
       this.runnerGroup.position.y = 0.08 + Math.abs(Math.sin(stridePhase)) * 0.14;
       this.leftLeg.rotation.x = Math.sin(stridePhase) * 0.65;
       this.rightLeg.rotation.x = -Math.sin(stridePhase) * 0.65;
+      if (this.hairRibbonL && this.hairRibbonR) {
+        this.hairRibbonL.rotation.x = 0.52 + Math.sin(stridePhase * 1.5) * 0.16;
+        this.hairRibbonR.rotation.x = 0.52 + Math.cos(stridePhase * 1.5) * 0.16;
+      }
 
       if (this.slashAnimTimer > 0) {
         this.slashAnimTimer -= dt;
@@ -933,7 +1031,9 @@
       [this.sharedSwipeGeo, this.sharedBurstGeo].filter(Boolean).forEach(g => geometries.add(g));
       [this.matOrb, this.matSwipeL, this.matSwipeR].filter(Boolean).forEach(m => materials.add(m));
       [this.texOrb, this.texSwipeL, this.texSwipeR].filter(Boolean).forEach(t => textures.add(t));
-      geometries.forEach(g => g.dispose()); materials.forEach(m => m.dispose()); textures.forEach(t => t.dispose());
+      geometries.forEach(g => { if (g && typeof g.dispose === 'function') g.dispose(); });
+      materials.forEach(m => { if (m && typeof m.dispose === 'function') m.dispose(); });
+      textures.forEach(t => { if (t && typeof t.dispose === 'function') t.dispose(); });
       if (this.renderer) { this.renderer.dispose(); this.renderer.domElement.remove(); }
       this.renderer = null; this.scene = null;
     }
