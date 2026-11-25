@@ -194,13 +194,31 @@
       this.texSwipeL = loadSafeTexture('./assets/sprites_transparent/note_swipe_cyan.png', () => makeSwipeFallbackTexture('left', '#00f2ff'));
       this.texSwipeR = loadSafeTexture('./assets/sprites_transparent/note_swipe_magenta.png', () => makeSwipeFallbackTexture('right', '#ff2bd6'));
 
-      // Shared reusable geometries & materials to prevent WebGL GPU memory leaks across retries
-      // depthWrite: false prevents transparent sprite quads from punching rectangular holes in translucent track ribbons!
-      this.sharedSwipeGeo = new THREE.PlaneGeometry(2.25, 1.65);
-      this.sharedBurstGeo = new THREE.RingGeometry(0.35, 1.25, 24);
-      this.matOrb = new THREE.SpriteMaterial({ map: this.texOrb, transparent: true, depthWrite: false });
-      this.matSwipeL = new THREE.MeshBasicMaterial({ map: this.texSwipeL, color: 0xb8fcff, transparent: true, depthWrite: false, side: THREE.DoubleSide });
-      this.matSwipeR = new THREE.MeshBasicMaterial({ map: this.texSwipeR, color: 0xffa6d8, transparent: true, depthWrite: false, side: THREE.DoubleSide });
+      // Shared Beat Saber 3D Volumetric Note Geometries & Materials
+      this.sharedTapBoxGeo = new THREE.BoxGeometry(1.08, 1.08, 1.08);
+      this.sharedTapEdgeGeo = new THREE.EdgesGeometry(this.sharedTapBoxGeo);
+      this.sharedTapCoreGeo = new THREE.OctahedronGeometry(0.44, 0);
+      this.sharedTapFaceGeo = new THREE.PlaneGeometry(0.94, 0.94);
+      this.sharedSwipeBoxGeo = new THREE.BoxGeometry(1.36, 1.02, 0.86);
+      this.sharedSwipeEdgeGeo = new THREE.EdgesGeometry(this.sharedSwipeBoxGeo);
+      this.sharedSwipeFaceGeo = new THREE.PlaneGeometry(1.18, 0.92);
+      this.sharedDebrisGeo = new THREE.BoxGeometry(0.52, 0.92, 0.78);
+      this.sharedBurstGeo = new THREE.RingGeometry(0.38, 1.38, 24);
+
+      this.matTapBody = new THREE.MeshStandardMaterial({ color: 0x162447, metalness: 0.78, roughness: 0.2, emissive: 0x104c75, emissiveIntensity: 0.95 });
+      this.matTapEdge = new THREE.LineBasicMaterial({ color: 0x00f2ff });
+      this.matTapCore = new THREE.MeshBasicMaterial({ color: 0xffd84d, transparent: true, opacity: 0.92 });
+      this.matTapFace = new THREE.MeshBasicMaterial({ map: this.texOrb, color: 0xfff3b0, transparent: true, depthWrite: false, side: THREE.DoubleSide });
+
+      this.matSwipeLBody = new THREE.MeshStandardMaterial({ color: 0x09243a, metalness: 0.8, roughness: 0.22, emissive: 0x006e8c, emissiveIntensity: 0.75 });
+      this.matSwipeLEdge = new THREE.LineBasicMaterial({ color: 0x00f2ff });
+      this.matSwipeL = new THREE.MeshBasicMaterial({ map: this.texSwipeL, color: 0xd0ffff, transparent: true, depthWrite: false, side: THREE.DoubleSide });
+
+      this.matSwipeRBody = new THREE.MeshStandardMaterial({ color: 0x360a2e, metalness: 0.8, roughness: 0.22, emissive: 0x8f0d66, emissiveIntensity: 0.75 });
+      this.matSwipeREdge = new THREE.LineBasicMaterial({ color: 0xff2bd6 });
+      this.matSwipeR = new THREE.MeshBasicMaterial({ map: this.texSwipeR, color: 0xffd4f0, transparent: true, depthWrite: false, side: THREE.DoubleSide });
+      this.splitDebris = [];
+      this.camShake = 0;
 
       this._buildTrackRibbons();
       this._buildCityEqualizers();
@@ -289,20 +307,31 @@
       this.hitLineMesh.position.set(0, 0.05, 0);
       this.scene.add(this.hitLineMesh);
 
-      // Give each lane its own strike target, visible against both route colors, synced with Fever & hit pulse.
-      const socketGeo = new THREE.RingGeometry(0.38, 0.59, 4);
+      // Neon Hologram Receiver Pads (Hexagonal Outer Ring + Inner Glowing Core + Vertical Holo-Ring)
+      const outerPadGeo = new THREE.RingGeometry(0.56, 0.76, 6);
+      const innerPadGeo = new THREE.CircleGeometry(0.46, 6);
       const socketMat = new THREE.MeshBasicMaterial({
-        color: 0xf1faff, side: THREE.DoubleSide, transparent: true, depthWrite: false
+        color: 0x00f2ff, side: THREE.DoubleSide, transparent: true, opacity: 0.92, depthWrite: false
+      });
+      const innerMat = new THREE.MeshBasicMaterial({
+        color: 0x70f8ff, side: THREE.DoubleSide, transparent: true, opacity: 0.28, depthWrite: false
       });
       this.laneSockets = [];
       this.lanePulse = [0, 0, 0];
       for (const laneX of [-2.15, 0, 2.15]) {
-        const socket = new THREE.Mesh(socketGeo, socketMat);
-        socket.rotation.x = -Math.PI / 2;
-        socket.position.set(laneX, 0.11, 0);
-        socket.renderOrder = 4;
-        this.scene.add(socket);
-        this.laneSockets.push(socket);
+        const padGroup = new THREE.Group();
+        const outer = new THREE.Mesh(outerPadGeo, socketMat);
+        outer.rotation.x = -Math.PI / 2;
+        outer.renderOrder = 4;
+        const inner = new THREE.Mesh(innerPadGeo, innerMat);
+        inner.rotation.x = -Math.PI / 2;
+        inner.position.y = 0.01;
+        inner.renderOrder = 4;
+        padGroup.add(outer, inner);
+        padGroup.material = socketMat;
+        padGroup.position.set(laneX, 0.11, 0);
+        this.scene.add(padGroup);
+        this.laneSockets.push(padGroup);
       }
     }
 
@@ -332,37 +361,93 @@
       this.runnerGroup.renderOrder = 6;
 
       this.runnerTrimMat = new THREE.MeshBasicMaterial({ color: 0xff2bd6 });
-      this.stickMat = new THREE.MeshBasicMaterial({ color: 0xff2bd6, transparent: true, opacity: 0.72, depthWrite: false });
+      this.stickMat = new THREE.MeshBasicMaterial({ color: 0xff2bd6 });
+      this.stickGlowMat = new THREE.MeshBasicMaterial({ color: 0xff2bd6, transparent: true, opacity: 0.38, depthWrite: false });
+      this.jacketMat = new THREE.MeshStandardMaterial({ color: 0x1b1636, metalness: 0.72, roughness: 0.28, emissive: 0x120a2e, emissiveIntensity: 0.5 });
+      this.hairMat = new THREE.MeshStandardMaterial({ color: 0xd929b8, metalness: 0.25, roughness: 0.4, emissive: 0x6b1066, emissiveIntensity: 0.6 });
+      const darkArmorMat = new THREE.MeshStandardMaterial({ color: 0x0d1022, metalness: 0.8, roughness: 0.25 });
 
-      // Ground Neon Hover-Skate Pulse Ring under Runner's Sneakers
+      // Ground Reflection Shadow + Neon Hover-Skate Ring under Runner
+      const shadowDisc = new THREE.Mesh(
+        new THREE.CircleGeometry(0.88, 24),
+        new THREE.MeshBasicMaterial({ color: 0x020410, transparent: true, opacity: 0.58, depthWrite: false })
+      );
+      shadowDisc.rotation.x = -Math.PI * 0.5;
+      shadowDisc.position.y = 0.02;
       const groundDisc = new THREE.Mesh(
-        new THREE.RingGeometry(0.32, 0.86, 28),
-        new THREE.MeshBasicMaterial({ color: 0x00f2ff, transparent: true, opacity: 0.42, depthWrite: false, side: THREE.DoubleSide })
+        new THREE.RingGeometry(0.55, 0.92, 28),
+        new THREE.MeshBasicMaterial({ color: 0x00f2ff, transparent: true, opacity: 0.55, depthWrite: false, side: THREE.DoubleSide })
       );
       groundDisc.rotation.x = -Math.PI * 0.5;
-      groundDisc.position.y = 0.03;
+      groundDisc.position.y = 0.035;
       groundDisc.renderOrder = 3;
-      this.runnerGroup.add(groundDisc);
+      this.runnerGroup.add(shadowDisc, groundDisc);
 
-      // Kinematic pivots preserved for compatibility & slash state
-      this.leftLeg = new THREE.Group();
-      this.rightLeg = new THREE.Group();
-      this.leftArmPivot = new THREE.Group();
-      this.rightArmPivot = new THREE.Group();
+      // Sculpted 3D Cyberpunk Runner Body (Metallic Cropped Jacket, Neon Spine Trim, Pauldrons, Head & Swept Hair)
+      const torso = new THREE.Mesh(new THREE.BoxGeometry(0.76, 0.92, 0.42), this.jacketMat);
+      torso.position.set(0, 1.52, 0);
+      const spineGlow = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.72, 0.08), this.runnerTrimMat);
+      spineGlow.position.set(0, 1.54, 0.22);
+      const collar = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.08, 8, 16), this.runnerTrimMat);
+      collar.rotation.x = Math.PI * 0.42;
+      collar.position.set(0, 1.96, 0.02);
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.32, 16, 14), darkArmorMat);
+      head.position.set(0, 2.28, 0);
+      const hairCap = new THREE.Mesh(new THREE.SphereGeometry(0.36, 14, 12), this.hairMat);
+      hairCap.scale.set(1.05, 1.08, 1.15);
+      hairCap.position.set(0, 2.34, 0.06);
+      const hairTail = new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.65, 10), this.hairMat);
+      hairTail.rotation.x = 0.45;
+      hairTail.position.set(0, 2.02, 0.32);
+      const waist = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.26, 0.36), darkArmorMat);
+      waist.position.set(0, 1.02, 0);
+      this.runnerGroup.add(torso, spineGlow, collar, head, hairCap, hairTail, waist);
+
+      // Articulated Legs with Neon Jet Sneakers
+      const buildLeg = (side) => {
+        const piv = new THREE.Group();
+        piv.position.set(side * 0.22, 0.98, 0);
+        const legMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.11, 0.82, 10), darkArmorMat);
+        legMesh.position.y = -0.42;
+        const shoe = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.18, 0.42), this.jacketMat);
+        shoe.position.set(0, -0.84, -0.06);
+        const jet = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.45, 8), this.runnerTrimMat);
+        jet.rotation.x = Math.PI * 0.5;
+        jet.position.set(0, -0.86, 0.34);
+        piv.add(legMesh, shoe, jet);
+        return piv;
+      };
+      this.leftLeg = buildLeg(-1);
+      this.rightLeg = buildLeg(1);
+
+      // Articulated Arms with Dual Luminous Plasma Blades (Flared Beat-Saber Stance)
+      const leftBladeGlowMat = new THREE.MeshBasicMaterial({ color: 0x00f2ff, transparent: true, opacity: 0.55, depthWrite: false });
+      const rightBladeGlowMat = new THREE.MeshBasicMaterial({ color: 0xff2bd6, transparent: true, opacity: 0.55, depthWrite: false });
+      const buildArm = (side) => {
+        const piv = new THREE.Group();
+        piv.position.set(side * 0.52, 1.84, 0);
+        const pauldron = new THREE.Mesh(new THREE.SphereGeometry(0.18, 10, 8), this.jacketMat);
+        const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.10, 0.08, 0.62, 8), darkArmorMat);
+        arm.position.set(side * 0.14, -0.26, -0.06);
+        arm.rotation.z = side * 0.35;
+        const hilt = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.28, 8), darkArmorMat);
+        hilt.position.set(side * 0.32, -0.46, -0.14);
+        hilt.rotation.z = -side * 0.65;
+        const bladeCore = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.028, 1.85, 8), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+        bladeCore.position.set(side * 0.88, -0.14, -0.24);
+        bladeCore.rotation.z = -side * 0.65;
+        bladeCore.rotation.x = 0.28;
+        const bladeSheath = new THREE.Mesh(new THREE.CylinderGeometry(0.125, 0.075, 1.94, 10), side < 0 ? leftBladeGlowMat : rightBladeGlowMat);
+        bladeSheath.position.set(side * 0.88, -0.14, -0.24);
+        bladeSheath.rotation.z = -side * 0.65;
+        bladeSheath.rotation.x = 0.28;
+        piv.add(pauldron, arm, hilt, bladeCore, bladeSheath);
+        return piv;
+      };
+      this.leftArmPivot = buildArm(-1);
+      this.rightArmPivot = buildArm(1);
       this.runnerGroup.add(this.leftLeg, this.rightLeg, this.leftArmPivot, this.rightArmPivot);
-
-      // High-Resolution 10-Frame Illustrated Anime Cyber-Runner Billboard Sprite
-      this.charFrames = window.RunnerSpriteBank ? window.RunnerSpriteBank.getFrames('luna') : null;
-      this.runnerSpriteMat = new THREE.SpriteMaterial({
-        map: this.charFrames ? this.charFrames.run[0] : null,
-        transparent: true,
-        depthWrite: false
-      });
-      this.runnerSprite = new THREE.Sprite(this.runnerSpriteMat);
-      this.runnerSprite.scale.set(3.25, 4.06, 1);
-      this.runnerSprite.position.set(0, 1.88, 0);
-      this.runnerSprite.renderOrder = 8;
-      this.runnerGroup.add(this.runnerSprite);
+      this.runnerSpriteMat = null;
 
       // Kai Sound Shield Ring / Fever Aura Ring around Runner
       const ringGeo = new THREE.TorusGeometry(1.05, 0.045, 10, 32);
@@ -488,9 +573,19 @@
       this.feverRemaining = 0;
       this.counts = { perfect: 0, great: 0, miss: 0 };
 
-      // Style runner colors & HD animated character sprite by selected character
+      // Style 3D cyberpunk runner jacket/hair/blades to match lobby character illustration!
       this.stickMat.color.setHex(this.charSpec.stickColor);
+      if (this.stickGlowMat) this.stickGlowMat.color.setHex(this.charSpec.stickColor);
       this.runnerTrimMat.color.setHex(this.charSpec.stickColor);
+      if (this.hairMat && this.jacketMat) {
+        const pal = this.charSpec.id === 'aria'
+          ? { hair: 0x7c3aed, jacket: 0xd8d3ee }
+          : this.charSpec.id === 'kai'
+          ? { hair: 0x1ad9ff, jacket: 0x15223e }
+          : { hair: 0xe632c2, jacket: 0x1b1636 };
+        this.hairMat.color.setHex(pal.hair);
+        this.jacketMat.color.setHex(pal.jacket);
+      }
       this.shieldRing.material.color.setHex(this.charSpec.auraColor);
       this.shieldRing.material.opacity = this.shieldLeft > 0 ? 0.55 : 0.0;
       if (window.RunnerSpriteBank && this.runnerSpriteMat) {
@@ -513,22 +608,26 @@
 
     _spawnNoteMeshes() {
       this.noteMeshes = this.chart.notes.map(note => {
-        let mesh;
+        const group = new THREE.Group();
         if (note.type === 'tap') {
-          mesh = new THREE.Sprite(this.matOrb);
-          mesh.scale.set(1.55, 1.55, 1);
+          const box = new THREE.Mesh(this.sharedTapBoxGeo, this.matTapBody);
+          const edges = new THREE.LineSegments(this.sharedTapEdgeGeo, this.matTapEdge);
+          const face = new THREE.Mesh(this.sharedTapFaceGeo, this.matTapFace);
+          face.position.z = 0.56;
+          group.add(box, edges, face);
         } else {
-          mesh = new THREE.Mesh(
-            this.sharedSwipeGeo,
-            note.type === 'swipeL' ? this.matSwipeL : this.matSwipeR
-          );
-          mesh.rotation.x = -Math.PI * 0.42;
+          const isLeft = note.type === 'swipeL';
+          const box = new THREE.Mesh(this.sharedSwipeBoxGeo, isLeft ? this.matSwipeLBody : this.matSwipeRBody);
+          const edges = new THREE.LineSegments(this.sharedSwipeEdgeGeo, isLeft ? this.matSwipeLEdge : this.matSwipeREdge);
+          const face = new THREE.Mesh(this.sharedSwipeFaceGeo, isLeft ? this.matSwipeL : this.matSwipeR);
+          face.position.z = 0.45;
+          group.add(box, edges, face);
         }
-        mesh.visible = false;
-        mesh.renderOrder = 4;
-        mesh.userData = { note };
-        this.scene.add(mesh);
-        return mesh;
+        group.visible = false;
+        group.renderOrder = 4;
+        group.userData = { note };
+        this.scene.add(group);
+        return group;
       });
     }
 
@@ -740,6 +839,19 @@
       ring.userData = { life: 0.28 };
       this.scene.add(ring);
       this.hitBursts.push(ring);
+
+      // Beat Saber 2-Piece Split Cube Shatter Debris + Micro Camera Shake
+      this.camShake = 0.14;
+      if (this.sharedDebrisGeo && this.splitDebris) {
+        for (const side of [-1, 1]) {
+          const dMat = new THREE.MeshStandardMaterial({ color: hexColor, emissive: hexColor, emissiveIntensity: 0.9, metalness: 0.6, roughness: 0.2, transparent: true, opacity: 0.95 });
+          const piece = new THREE.Mesh(this.sharedDebrisGeo, dMat);
+          piece.position.set(x + side * 0.28, 0.85, 0);
+          piece.userData = { vx: side * (4.8 + Math.random() * 2.4), vy: 4.2 + Math.random() * 2.2, vz: 2.5, life: 0.42 };
+          this.scene.add(piece);
+          this.splitDebris.push(piece);
+        }
+      }
     }
 
     // ==================== MAIN 60FPS RENDER LOOP ====================
@@ -836,8 +948,15 @@
         this.runnerSpriteMat.rotation = this.runnerGroup.rotation.z * 0.65;
       }
 
-      // Subtle dynamic camera follow
-      this.camera.position.x = this.visualLaneX * 0.35;
+      // Subtle dynamic camera follow + micro hit-shake
+      let shakeX = 0, shakeY = 0;
+      if (this.camShake > 0) {
+        this.camShake = Math.max(0, this.camShake - dt);
+        shakeX = (Math.random() - 0.5) * 0.22 * (this.camShake / 0.14);
+        shakeY = (Math.random() - 0.5) * 0.16 * (this.camShake / 0.14);
+      }
+      this.camera.position.x = this.visualLaneX * 0.35 + shakeX;
+      this.camera.position.y = 4.9 + shakeY;
       this.camera.lookAt(this.visualLaneX * 0.25, 1.3, -18);
 
       // 4. Update Notes along 3D Curved Track & Detect Misses
@@ -889,18 +1008,39 @@
 
         const laneOffset = (note.lane - 1) * laneWidth;
         const worldX = base.x + noteBranchSign * sep - this.visualBranchOffset + laneOffset;
-        const worldY = base.y + (note.type === 'tap' ? 0.78 : 0.16);
+        const worldY = base.y + (note.type === 'tap' ? 0.85 : 0.72);
         const worldZ = -zAhead;
 
         mesh.position.set(worldX, worldY, worldZ);
         if (note.type === 'tap') {
-          const pulse = 1.45 + Math.sin(songTime * 12 + i) * 0.12;
-          mesh.scale.set(pulse, pulse, 1);
+          const pulse = 1.0 + Math.sin(songTime * 10 + i) * 0.08;
+          mesh.scale.set(pulse, pulse, pulse);
+          mesh.rotation.y = songTime * 2.2 + i * 0.6;
+          mesh.rotation.x = Math.sin(songTime * 1.8 + i) * 0.22;
         }
         mesh.visible = true;
       }
 
-      // 5. Animate Hit Bursts & Equalizer Skyline Towers
+      // 5. Animate Hit Bursts, 2-Piece Split Cube Debris & Equalizer Skyline Towers
+      if (this.splitDebris && this.splitDebris.length) {
+        for (let i = this.splitDebris.length - 1; i >= 0; i--) {
+          const p = this.splitDebris[i];
+          p.userData.life -= dt;
+          if (p.userData.life <= 0) {
+            this.scene.remove(p);
+            if (p.material) p.material.dispose();
+            this.splitDebris.splice(i, 1);
+          } else {
+            p.position.x += p.userData.vx * dt;
+            p.position.y += p.userData.vy * dt;
+            p.position.z += p.userData.vz * dt;
+            p.userData.vy -= 14 * dt;
+            p.rotation.x += dt * 9;
+            p.rotation.z += dt * 7;
+            p.material.opacity = Math.max(0, p.userData.life / 0.42);
+          }
+        }
+      }
       for (let i = this.hitBursts.length - 1; i >= 0; i--) {
         const b = this.hitBursts[i];
         b.userData.life -= dt;
