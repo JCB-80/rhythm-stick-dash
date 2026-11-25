@@ -119,6 +119,18 @@ test('original adjacent-lane assistance, swipe-any, character multipliers and sh
   assert.equal(g._tryStrikeNote('swipeAny'), true);
   assert.equal(c.CHAR_SPECS.luna.comboScoreMult, 1.05); assert.equal(c.CHAR_SPECS.aria.comboScoreMult, 1.25); assert.equal(c.CHAR_SPECS.kai.shieldCharges, 2);
 });
+test('P1 fixes: HUD CSS selectors match DOM IDs and moveLane swings sticks on swipe hit', () => {
+  const css = fs.readFileSync(path.join(root, 'style.css'), 'utf8');
+  assert.match(css, /#hud-score-num,\s*#hud-combo-num,\s*#hud-route-mult/);
+  assert.match(css, /\.ingame-top-hud\s*\{\s*backdrop-filter:/);
+  const { ctx: c } = runtime(); const g = new c.RhythmGame3D(null);
+  g.active = true; g.paused = false; g.currentLane = 1;
+  g.runnerGroup = { rotation: { z: 0 } };
+  let swung = false; g._swingSticks = (big) => { swung = big === true; };
+  g._tryStrikeNote = () => true;
+  assert.equal(g.moveLane(1), true);
+  assert.equal(swung, true);
+});
 function renderStub(c) {
   const g = new c.RhythmGame3D(null), color = { setHex() {} };
   g.active = true; g.song = { bpm: 132, duration: 1000 };

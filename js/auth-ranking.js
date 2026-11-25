@@ -29,6 +29,9 @@
       // VIP is a free local demo, never a verified purchase entitlement.
       vip: raw.vip === true, loggedOut: !!raw.loggedOut, createdAt: raw.createdAt,
       xp: Math.floor(number(raw.xp)), cores: Math.floor(number(raw.cores)), league: Math.floor(number(raw.league, 0, 2)),
+      ownedCosmetics: Array.isArray(raw.ownedCosmetics) ? raw.ownedCosmetics.filter(x => typeof x === 'string').slice(0, 32) : [],
+      equippedSkin: typeof raw.equippedSkin === 'string' ? raw.equippedSkin.slice(0, 32) : 'default',
+      musicPassTier: Math.max(1, Math.min(30, Math.floor(number(raw.musicPassTier, 1, 30)))),
       settings: { bgmVol: number(settings.bgmVol, .75, 1), sfxVol: number(settings.sfxVol, .85, 1), autoFever: settings.autoFever !== false,
         audioOffset: typeof settings.audioOffset === 'number' && Number.isFinite(settings.audioOffset) ? Math.max(-.25, Math.min(.25, settings.audioOffset)) : 0 }
     };

@@ -465,6 +465,7 @@
       this.visibleStartIndex = 0;
       this.currentLane = 1;
       this.visualLaneX = 0;
+      this.lanePulse = [0, 0, 0];
       this.chosenBranch = 'none';
       this.visualBranchOffset = 0;
 
@@ -540,6 +541,9 @@
 
       // Preserve the original assisted directional slash while steering.
       const struck = this._tryStrikeNote(dir < 0 ? 'swipeL' : 'swipeR', true);
+      if (struck) {
+        this._swingSticks(true);
+      }
 
       if (this.currentLane !== prevLane) {
         this.runnerGroup.rotation.z = -dir * 0.24;

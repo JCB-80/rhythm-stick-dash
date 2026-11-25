@@ -1922,11 +1922,11 @@ button:disabled { opacity: .5; cursor: default; }
 }
 
 /* Step 2 Polish: Tabular HUD Numerals & Frosted Contrast */
-#hud-score, #hud-combo, #hud-progress, #hud-mult {
+#hud-score-num, #hud-combo-num, #hud-route-mult {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
-.hud-top-bar {
+.ingame-top-hud {
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
 }

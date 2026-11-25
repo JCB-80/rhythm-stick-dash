@@ -789,6 +789,54 @@
       showToast(res.ok ? window.I18n.t('reward_received') + ' +300' : window.I18n.t(res.reason));
     });
 
+    const syncCosmeticShopUI = () => {
+      const u = window.AuthService.getCurrentUser();
+      if (!u) return;
+      if ($('music-pass-tier-lbl')) $('music-pass-tier-lbl').textContent = `PASS TIER ${u.musicPassTier || 1}/30`;
+    };
+    const buyCosmetic = (id, currency, cost, label) => {
+      const u = window.AuthService.getCurrentUser();
+      if (!u) return;
+      const owned = Array.isArray(u.ownedCosmetics) ? u.ownedCosmetics : [];
+      if (owned.includes(id)) {
+        window.AuthService.updateUser({ equippedSkin: id });
+        showToast(`✅ Equipped ${label}`);
+        return;
+      }
+      if ((u[currency] || 0) < cost) {
+        showToast(currency === 'cores' ? `BEAT CORE < ${cost}!` : `Coins < ${cost}!`);
+        return;
+      }
+      window.AudioEngine.playClearFanfare();
+      window.AuthService.updateUser({
+        [currency]: (u[currency] || 0) - cost,
+        ownedCosmetics: [...owned, id],
+        equippedSkin: id
+      });
+      if (state.currentScene === 'scene-lobby') renderLobby();
+      syncCosmeticShopUI();
+      showToast(`✨ Unlocked & Equipped ${label}!`);
+    };
+    if ($('btn-buy-skin-prism')) $('btn-buy-skin-prism').addEventListener('click', () => buyCosmetic('prism_stick', 'coins', 400, 'Prism Stick'));
+    if ($('btn-buy-track-nova')) $('btn-buy-track-nova').addEventListener('click', () => buyCosmetic('nova_track', 'cores', 15, 'Nova Track'));
+    if ($('btn-buy-aura-valk')) $('btn-buy-aura-valk').addEventListener('click', () => buyCosmetic('valk_aura', 'coins', 600, 'Valk Aura'));
+    if ($('btn-claim-music-pass')) {
+      $('btn-claim-music-pass').addEventListener('click', () => {
+        const u = window.AuthService.getCurrentUser();
+        if (!u) return;
+        const nextTier = Math.min(30, (u.musicPassTier || 1) + 1);
+        window.AudioEngine.playClearFanfare();
+        window.AuthService.updateUser({
+          musicPassTier: nextTier,
+          coins: (u.coins || 0) + 250,
+          cores: (u.cores || 0) + 5
+        });
+        if (state.currentScene === 'scene-lobby') renderLobby();
+        syncCosmeticShopUI();
+        showToast(`🎵 Music Pass Tier ${nextTier}/30 (+250 🪙 / +5 ⚡CORE)`);
+      });
+    }
+
     $('btn-open-settings').addEventListener('click', () => {
       window.AudioEngine.playUiClick();
       openSettingsModal(false);
