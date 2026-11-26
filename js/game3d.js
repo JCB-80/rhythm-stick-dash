@@ -477,6 +477,17 @@
           slash_x: loader.load(`./assets/characters/runner_${cid}_slash_x.png`)
         };
       }
+      // 8-Frame (4x2) Smooth Sprite Sheets for Flagship Runner Luna (12-16 FPS seamless animation)
+      const loadSheetTex = (url) => {
+        const t = loader.load(url);
+        t.repeat.set(0.25, 0.5);
+        t.offset.set(0, 0.5);
+        return t;
+      };
+      this.lunaSheets = {
+        run:   loadSheetTex('./assets/characters/runner_luna_run_sheet.png'),
+        slash: loadSheetTex('./assets/characters/runner_luna_slash_sheet.png')
+      };
       this.currentRunnerPose = 'run1';
       this.lastSlashPose = 'slash_l';
       this.saberSkinSpec = SABER_SKINS.neon_plasma;
@@ -1095,17 +1106,35 @@
       const slashPunch = this.slashAnimTimer > 0 ? Math.sin(slashProg * Math.PI) : 0;
       const recoilRatio = this.missRecoilTimer > 0 ? (this.missRecoilTimer / 0.22) : 0;
 
-      // 5-Pose Multi-Frame State Machine + Elastic Squash-Stretch + Z-Lunge + Miss Recoil
+      // 8-Frame (4x2) Smooth Sprite-Sheet State Machine for Luna + 5-Pose Fallback for Kai/Aria
       if (this.runnerSprite && this.runnerSpriteMat && this.runnerPoseTextures) {
         const poseSet = this.runnerPoseTextures[this.charSpec.id] || this.runnerPoseTextures.luna;
-        const beatHalf = Math.floor(songTime * (this.song.bpm / 60) * 2) % 2;
-        const desiredPose = this.slashAnimTimer > 0
-          ? (this.lastSlashPose || 'slash_l')
-          : (beatHalf === 0 ? 'run1' : 'run2');
-        if (desiredPose !== this.currentRunnerPose && poseSet[desiredPose]) {
-          this.currentRunnerPose = desiredPose;
-          this.runnerSpriteMat.map = poseSet[desiredPose];
-          this.runnerSpriteMat.needsUpdate = true;
+        const useLunaSheet = this.charSpec.id === 'luna' && this.lunaSheets && this.lunaSheets.run && this.lunaSheets.run.image;
+        if (useLunaSheet) {
+          const isSlashing = this.slashAnimTimer > 0;
+          const sheetTex = isSlashing ? this.lunaSheets.slash : this.lunaSheets.run;
+          const frameIdx = isSlashing
+            ? Math.min(7, Math.floor(slashProg * 8))
+            : Math.floor(songTime * (this.song.bpm / 60) * 4) % 8;
+          const col = frameIdx % 4;
+          const row = Math.floor(frameIdx / 4);
+          sheetTex.repeat.set(0.25, 0.5);
+          sheetTex.offset.set(col * 0.25, (1 - row) * 0.5);
+          if (this.runnerSpriteMat.map !== sheetTex) {
+            this.runnerSpriteMat.map = sheetTex;
+            this.runnerSpriteMat.needsUpdate = true;
+          }
+          this.currentRunnerPose = isSlashing ? 'slash_x' : 'run1';
+        } else {
+          const beatHalf = Math.floor(songTime * (this.song.bpm / 60) * 2) % 2;
+          const desiredPose = this.slashAnimTimer > 0
+            ? (this.lastSlashPose || 'slash_l')
+            : (beatHalf === 0 ? 'run1' : 'run2');
+          if (desiredPose !== this.currentRunnerPose && poseSet[desiredPose]) {
+            this.currentRunnerPose = desiredPose;
+            this.runnerSpriteMat.map = poseSet[desiredPose];
+            this.runnerSpriteMat.needsUpdate = true;
+          }
         }
         const strideSquash = Math.cos(stridePhase * 2) * 0.055;
         const baseScale = 3.35 + slashPunch * 0.24;
