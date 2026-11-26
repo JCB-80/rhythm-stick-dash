@@ -269,6 +269,8 @@
       this.matSwipeR = new THREE.MeshBasicMaterial({ map: this.texSwipeR, transparent: true, depthWrite: false, side: THREE.DoubleSide });
       this.splitDebris = [];
       this.camShake = 0;
+      this.fovPunchTimer = 0;
+      this.baseFov = 60;
 
       this._buildTrackRibbons();
       this._buildCityEqualizers();
@@ -674,6 +676,10 @@
       this.feverRemaining = 8.0 + this.charSpec.feverBonusSec;
       this.feverEndTime = window.AudioEngine.getSongTime() + this.feverRemaining;
       window.AudioEngine.playFeverTriggerSfx();
+      if (window.Haptics) window.Haptics.trigger('fever');
+      this.fovPunchTimer = 0.22;
+      this.camShake = 0.24;
+      this._spawnHitBurst(this.visualLaneX, 0xffd84d, true);
       if (this.callbacks.onFeverState) this.callbacks.onFeverState(true);
     }
 
@@ -770,6 +776,7 @@
           this.combo = 0;
           this.hp = Math.max(0, this.hp - 10);
           window.AudioEngine.playMissSfx();
+          if (window.Haptics) window.Haptics.trigger('miss');
           if (this.callbacks.onJudgment) {
             this.callbacks.onJudgment({ grade: 'MISS', combo: 0, score: this.score, hp: this.hp / this.charSpec.maxHp });
           }
@@ -810,7 +817,18 @@
       }
 
       window.AudioEngine.playHitSfx(note.type === 'tap' ? 'tap' : 'swipe', this.isFever);
-      this._spawnHitBurst(this.visualLaneX, this.isFever ? 0xffd84d : this.charSpec.stickColor);
+      if (window.Haptics) {
+        if (this.combo === 10 || this.combo === 25 || this.combo === 50 || this.combo === 100) {
+          window.Haptics.trigger('combo');
+        } else {
+          window.Haptics.trigger(note.type === 'tap' ? 'tap' : 'swipe');
+        }
+      }
+      if (grade === 'PERFECT') {
+        this.fovPunchTimer = 0.12;
+      }
+      const isMilestone = (this.combo === 10 || this.combo === 25 || this.combo === 50 || this.combo === 100);
+      this._spawnHitBurst(this.visualLaneX, (this.isFever || isMilestone) ? 0xffd84d : this.charSpec.stickColor, isMilestone);
 
       if (this.callbacks.onJudgment) {
         this.callbacks.onJudgment({
@@ -820,31 +838,39 @@
           hp: this.hp / this.charSpec.maxHp,
           feverGauge: this.feverGauge,
           isFever: this.isFever,
-          totalMult: routeMult * feverMult
+          totalMult: routeMult * feverMult,
+          milestone: isMilestone ? this.combo : 0
         });
       }
     }
 
-    _spawnHitBurst(x, hexColor) {
-      const mat = new THREE.MeshBasicMaterial({ color: hexColor, transparent: true, opacity: 0.92, depthWrite: false, side: THREE.DoubleSide });
+    _spawnHitBurst(x, hexColor, isBig = false) {
+      this.camShake = isBig ? 0.22 : 0.14;
+      if (typeof THREE === 'undefined' || !this.scene) return;
+      const mat = new THREE.MeshBasicMaterial({ color: hexColor, transparent: true, opacity: 0.94, depthWrite: false, side: THREE.DoubleSide });
       const ring = new THREE.Mesh(this.sharedBurstGeo, mat);
       ring.rotation.x = -Math.PI * 0.45;
       ring.position.set(x, 0.25, 0);
+      ring.scale.setScalar(isBig ? 1.65 : 1.0);
       ring.renderOrder = 5;
-      ring.userData = { life: 0.28 };
+      ring.userData = { life: isBig ? 0.36 : 0.28 };
       this.scene.add(ring);
       this.hitBursts.push(ring);
 
-      // Beat Saber 2-Piece Split Cube Shatter Debris + Micro Camera Shake
-      this.camShake = 0.14;
+      // Escalating Beat Saber Split Cube Shatter Debris (2 -> 4 -> 6 pieces with combo) + Camera Shake
+      this.camShake = isBig ? 0.22 : 0.14;
+      const pairs = this.combo >= 25 ? 3 : (this.combo >= 10 ? 2 : 1);
       if (this.sharedDebrisGeo && this.splitDebris) {
-        for (const side of [-1, 1]) {
-          const dMat = new THREE.MeshStandardMaterial({ color: hexColor, emissive: hexColor, emissiveIntensity: 0.9, metalness: 0.6, roughness: 0.2, transparent: true, opacity: 0.95 });
-          const piece = new THREE.Mesh(this.sharedDebrisGeo, dMat);
-          piece.position.set(x + side * 0.28, 0.85, 0);
-          piece.userData = { vx: side * (4.8 + Math.random() * 2.4), vy: 4.2 + Math.random() * 2.2, vz: 2.5, life: 0.42 };
-          this.scene.add(piece);
-          this.splitDebris.push(piece);
+        for (let p = 0; p < pairs; p++) {
+          for (const side of [-1, 1]) {
+            const dMat = new THREE.MeshStandardMaterial({ color: hexColor, emissive: hexColor, emissiveIntensity: 0.95, metalness: 0.6, roughness: 0.2, transparent: true, opacity: 0.95 });
+            const piece = new THREE.Mesh(this.sharedDebrisGeo, dMat);
+            piece.position.set(x + side * (0.28 + p * 0.14), 0.85 + p * 0.18, 0);
+            piece.scale.setScalar(1.0 - p * 0.18);
+            piece.userData = { vx: side * (4.6 + p * 1.4 + Math.random() * 2.4), vy: 4.0 + p * 1.1 + Math.random() * 2.2, vz: 2.5, life: 0.42 };
+            this.scene.add(piece);
+            this.splitDebris.push(piece);
+          }
         }
       }
     }
@@ -937,12 +963,23 @@
         this.runnerSprite.scale.set(3.25 / squash, 3.25 * squash, 1);
       }
 
-      // Subtle dynamic camera follow + micro hit-shake
+      // Subtle dynamic camera follow + micro hit-shake + PERFECT FOV zoom punch (60 -> 57.2 -> 60)
       let shakeX = 0, shakeY = 0;
       if (this.camShake > 0) {
         this.camShake = Math.max(0, this.camShake - dt);
         shakeX = (Math.random() - 0.5) * 0.22 * (this.camShake / 0.14);
         shakeY = (Math.random() - 0.5) * 0.16 * (this.camShake / 0.14);
+      }
+      if (this.camera) {
+        let targetFov = this.baseFov || 60;
+        if (this.fovPunchTimer > 0) {
+          this.fovPunchTimer = Math.max(0, this.fovPunchTimer - dt);
+          targetFov = 60 - 2.8 * Math.sin((this.fovPunchTimer / 0.12) * Math.PI * 0.5);
+        }
+        if (Math.abs(this.camera.fov - targetFov) > 0.05) {
+          this.camera.fov += (targetFov - this.camera.fov) * Math.min(1, dt * 24);
+          this.camera.updateProjectionMatrix();
+        }
       }
       this.camera.position.x = this.visualLaneX * 0.35 + shakeX;
       this.camera.position.y = 4.9 + shakeY;

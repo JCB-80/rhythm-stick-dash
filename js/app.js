@@ -471,7 +471,53 @@
     rightEl.innerHTML = state.ghostRivals.slice(2, 4).map(renderCard).join('');
   }
 
-  function handleJudgmentHud({ grade, combo, score, hp, feverGauge, totalMult }) {
+  // Global Safe Haptics Engine (Top-Grossing Tactile Feedback)
+  const HAPTIC_PATTERNS = {
+    light: 10, tap: 12, medium: 22, swipe: 22, heavy: 40,
+    combo: [18, 25, 38], fever: [30, 25, 65], jackpot: [25, 25, 45, 25, 70], miss: 45
+  };
+  let _hapticOn = true;
+  try { _hapticOn = localStorage.getItem('rsd_haptic_enabled') !== '0'; } catch {}
+  window.Haptics = {
+    get enabled() { return _hapticOn; },
+    setEnabled(val) {
+      _hapticOn = !!val;
+      try { localStorage.setItem('rsd_haptic_enabled', _hapticOn ? '1' : '0'); } catch {}
+    },
+    trigger(type) {
+      if (!_hapticOn) return;
+      try {
+        if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+          navigator.vibrate(HAPTIC_PATTERNS[type] || 12);
+        }
+      } catch {}
+    }
+  };
+
+  function triggerEdgeFlash(color) {
+    const el = $('edge-flash-fx');
+    if (!el) return;
+    el.style.boxShadow = `inset 0 0 68px 18px ${color}`;
+    el.style.opacity = '0.9';
+    clearTimeout(state.edgeFlashTimer);
+    state.edgeFlashTimer = setTimeout(() => { el.style.opacity = '0'; }, 140);
+  }
+
+  function showComboMilestone(combo) {
+    const el = $('combo-milestone-banner');
+    if (!el) return;
+    const tag = combo >= 100 ? 'GODLIKE!' : combo >= 50 ? 'HYPERDRIVE!' : combo >= 25 ? 'OVERDRIVE!' : 'FLOW!';
+    el.textContent = `${combo} COMBO! ${tag}`;
+    el.style.opacity = '1';
+    el.style.transform = 'translate(-50%,-50%) scale(1.12)';
+    clearTimeout(state.milestoneTimer);
+    state.milestoneTimer = setTimeout(() => {
+      el.style.opacity = '0';
+      el.style.transform = 'translate(-50%,-50%) scale(0.85)';
+    }, 850);
+  }
+
+  function handleJudgmentHud({ grade, combo, score, hp, feverGauge, totalMult, milestone }) {
     $('hud-combo-num').textContent = combo;
     $('hud-score-num').textContent = score.toLocaleString();
     $('hud-hp-fill').style.width = `${Math.round(hp * 100)}%`;
@@ -480,6 +526,16 @@
     }
     if (totalMult) {
       $('hud-route-mult').textContent = `${totalMult.toFixed(1)}x`;
+    }
+
+    if (grade === 'PERFECT') {
+      triggerEdgeFlash(combo >= 25 ? 'rgba(255, 43, 214, 0.55)' : 'rgba(0, 242, 255, 0.45)');
+    } else if (grade === 'MISS') {
+      triggerEdgeFlash('rgba(239, 68, 68, 0.55)');
+    }
+    if (milestone) {
+      showComboMilestone(milestone);
+      triggerEdgeFlash('rgba(253, 224, 71, 0.65)');
     }
 
     // Judgment PNG Sprite Popup
@@ -652,6 +708,9 @@
       $('input-bgm-vol').value = Math.round((user.settings.bgmVol ?? 0.75) * 100);
       $('input-sfx-vol').value = Math.round((user.settings.sfxVol ?? 0.85) * 100);
       $('input-auto-fever').checked = !!user.settings.autoFever;
+      if ($('input-haptic-enabled') && window.Haptics) {
+        $('input-haptic-enabled').checked = window.Haptics.enabled;
+      }
       $('input-nickname').value = user.nickname || '';
       $('input-audio-offset').value = Math.round(user.settings.audioOffset * 1000);
     }
@@ -670,6 +729,9 @@
     const bgmVol = Number($('input-bgm-vol').value) / 100;
     const sfxVol = Number($('input-sfx-vol').value) / 100;
     const autoFever = $('input-auto-fever').checked;
+    if ($('input-haptic-enabled') && window.Haptics) {
+      window.Haptics.setEnabled($('input-haptic-enabled').checked);
+    }
     const nick = $('input-nickname').value.trim();
 
     window.AudioEngine.setVolumes(bgmVol, sfxVol);
