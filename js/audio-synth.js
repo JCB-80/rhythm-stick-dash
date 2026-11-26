@@ -1,96 +1,176 @@
-// Studio-Grade Web Audio K-Pop / Slap House / Jersey Club / Liquid DnB / Drift Phonk Synthesizer
-// Preserves 100% of API, deterministic 16 beatmaps, voice tracking, pause/resume & MP3 decoder
+// Multi-Track Stereo OGG Audio Engine + BPM-Synced Beatmap & Rush Barrage Generator
+// Plays real 44.1kHz stereo .ogg tracks via AudioBuffer with crossfade, pause/resume & Custom MP3 upload
 (function () {
   window.SONGS = [
     {
-      id: 'galaxy_chase',
-      title: 'Galaxy Chase',
+      id: 'seoul_neon_pulse',
+      title: 'Seoul Neon Pulse',
       bpm: 132,
-      duration: 64,
-      lengthText: '01:04',
-      artist: 'LUNA · K-ELECTRO HOUSE',
+      duration: 80.0,
+      lengthText: '01:20',
+      artist: 'NEO SYNDICATE · K-ELECTRO HOUSE',
       descKey: 'song_1_desc',
+      audioUrl: './assets/audio/tracks/01_seoul_neon_pulse.ogg',
+      bgUrl: './assets/screens/bg_01_neo_seoul.png',
       colors: ['#00f2ff', '#ff2bd6'],
-      icon: '🌌',
-      style: 'kpop_house',
-      rootFreq: 185.0, // F#3 minor (Modern K-Pop Supernova/Anthem key!)
-      chords: [
-        [0, 3, 7, 10],     // F#m7
-        [-4, 0, 3, 8],     // Dmaj7
-        [3, 7, 10, 15],    // Aadd9
-        [-2, 2, 5, 7]      // E6
-      ],
-      scale: [0, 2, 3, 5, 7, 10, 12, 15],
-      melodyPattern: [7, 6, 5, 3, 5, 6, 7, 5, 4, 3, 2, 0, 2, 3, 5, 4]
+      badge: '01',
+      style: 'house'
     },
     {
-      id: 'neon_pulse',
-      title: 'Neon Pulse',
-      bpm: 124,
-      duration: 62,
-      lengthText: '01:02',
-      artist: 'KAI · JERSEY CLUB & UKG',
+      id: 'hyperpop_overdrive',
+      title: 'Hyperpop Overdrive',
+      bpm: 150,
+      duration: 76.8,
+      lengthText: '01:17',
+      artist: 'LUNA · HYPERPOP DANCE',
       descKey: 'song_2_desc',
-      colors: ['#00ffaa', '#00b8ff'],
-      icon: '⚡',
-      style: 'jersey_ukg',
-      rootFreq: 196.0, // G3 minor9 (Trendy NewJeans / ILLIT / UKG Pluggnb vibe)
-      chords: [
-        [0, 3, 7, 10, 14], // Gm9
-        [5, 9, 12, 15],    // C13
-        [-2, 2, 5, 9],     // Fmaj7
-        [-5, -2, 2, 5]     // Dm7
-      ],
-      scale: [0, 2, 3, 5, 7, 10, 12, 14],
-      melodyPattern: [5, 7, 6, 4, 5, 3, 2, 4, 5, 7, 6, 5, 3, 2, 1, 0]
+      audioUrl: './assets/audio/tracks/02_hyperpop_overdrive.ogg',
+      bgUrl: './assets/screens/bg_02_cyber_club.png',
+      colors: ['#ff2bd6', '#7c3aed'],
+      badge: '02',
+      style: 'hyperpop'
     },
     {
-      id: 'silent_city',
-      title: 'Silent City Break',
+      id: 'gangnam_midnight',
+      title: 'Gangnam Midnight',
+      bpm: 128,
+      duration: 75.0,
+      lengthText: '01:15',
+      artist: 'K-PULSE · CLUB BOUNCE',
+      descKey: 'song_1_desc',
+      audioUrl: './assets/audio/tracks/03_gangnam_midnight.ogg',
+      bgUrl: './assets/screens/bg_01_neo_seoul.png',
+      colors: ['#38bdf8', '#f472b6'],
+      badge: '03',
+      style: 'bounce'
+    },
+    {
+      id: 'jersey_club_rush',
+      title: 'Jersey Club Rush',
       bpm: 142,
-      duration: 66,
-      lengthText: '01:06',
-      artist: 'ARIA · LIQUID DNB',
-      descKey: 'song_3_desc',
-      colors: ['#8a5cff', '#00f2ff'],
-      icon: '🌃',
-      style: 'liquid_dnb',
-      rootFreq: 246.94, // B3 minor7 (Viral Liquid Drum & Bass / Hyperpop)
-      chords: [
-        [0, 3, 7, 10],     // Bm7
-        [-4, 0, 3, 7],     // Gmaj7
-        [3, 7, 10, 14],    // Dmaj7
-        [-5, -1, 2, 5]     // F#m7
-      ],
-      scale: [0, 2, 3, 5, 7, 10, 12, 14],
-      melodyPattern: [7, 5, 4, 2, 4, 5, 7, 6, 5, 4, 3, 2, 3, 5, 4, 2]
+      duration: 74.4,
+      lengthText: '01:14',
+      artist: 'KAI · JERSEY CLUB',
+      descKey: 'song_2_desc',
+      audioUrl: './assets/audio/tracks/04_jersey_club_rush.ogg',
+      bgUrl: './assets/screens/bg_02_cyber_club.png',
+      colors: ['#00ffaa', '#00b8ff'],
+      badge: '04',
+      style: 'jersey'
     },
     {
-      id: 'cyber_overdrive',
-      title: 'Cyber Overdrive',
-      bpm: 156,
-      duration: 68,
-      lengthText: '01:08',
+      id: 'cyber_phonk_drift',
+      title: 'Cyber Phonk Drift',
+      bpm: 148,
+      duration: 77.8,
+      lengthText: '01:18',
       artist: 'NEO CORE · DRIFT PHONK',
       descKey: 'song_4_desc',
-      colors: ['#ff2bd6', '#ffd84d'],
-      icon: '🔥',
-      style: 'drift_phonk',
-      rootFreq: 164.81, // E3 Phrygian/Minor (Viral Drift Phonk Cowbell + Festival Rave)
-      chords: [
-        [0, 3, 7, 12],
-        [1, 5, 8, 13],
-        [0, 3, 7, 12],
-        [-2, 2, 5, 10]
-      ],
-      scale: [0, 1, 3, 5, 7, 8, 10, 12],
-      melodyPattern: [0, 4, 3, 4, 6, 4, 3, 1, 0, 4, 7, 6, 4, 3, 1, 0]
+      audioUrl: './assets/audio/tracks/05_cyber_phonk_drift.ogg',
+      bgUrl: './assets/screens/bg_04_sunset_tokyo.png',
+      colors: ['#ff3d5a', '#ffd84d'],
+      badge: '05',
+      style: 'phonk'
+    },
+    {
+      id: 'starlight_future_bass',
+      title: 'Starlight Future Bass',
+      bpm: 136,
+      duration: 77.6,
+      lengthText: '01:18',
+      artist: 'ARIA · FUTURE BASS',
+      descKey: 'song_3_desc',
+      audioUrl: './assets/audio/tracks/06_starlight_future_bass.ogg',
+      bgUrl: './assets/screens/bg_03_orbital_highway.png',
+      colors: ['#8a5cff', '#00f2ff'],
+      badge: '06',
+      style: 'future_bass'
+    },
+    {
+      id: 'retro_synth_highway',
+      title: 'Retro Synth Highway',
+      bpm: 126,
+      duration: 76.2,
+      lengthText: '01:16',
+      artist: 'TOKYO 2099 · SYNTHWAVE',
+      descKey: 'song_3_desc',
+      audioUrl: './assets/audio/tracks/07_retro_synth_highway.ogg',
+      bgUrl: './assets/screens/bg_04_sunset_tokyo.png',
+      colors: ['#ff7b00', '#ff2bd6'],
+      badge: '07',
+      style: 'synthwave'
+    },
+    {
+      id: 'festival_bigroom_drop',
+      title: 'Festival Bigroom Drop',
+      bpm: 130,
+      duration: 73.8,
+      lengthText: '01:14',
+      artist: 'MAIN STAGE · BIG ROOM EDM',
+      descKey: 'song_4_desc',
+      audioUrl: './assets/audio/tracks/08_festival_bigroom_drop.ogg',
+      bgUrl: './assets/screens/bg_05_quantum_arena.png',
+      colors: ['#ffd84d', '#00f2ff'],
+      badge: '08',
+      style: 'bigroom'
+    },
+    {
+      id: 'velocity_dnb',
+      title: 'Velocity DnB',
+      bpm: 172,
+      duration: 78.1,
+      lengthText: '01:18',
+      artist: 'ARIA · LIQUID D&B',
+      descKey: 'song_3_desc',
+      audioUrl: './assets/audio/tracks/09_velocity_dnb.ogg',
+      bgUrl: './assets/screens/bg_03_orbital_highway.png',
+      colors: ['#22d3ee', '#a855f7'],
+      badge: '09',
+      style: 'dnb'
+    },
+    {
+      id: 'velvet_nu_disco',
+      title: 'Velvet Nu-Disco',
+      bpm: 124,
+      duration: 77.4,
+      lengthText: '01:17',
+      artist: 'VELVET CLUB · NU-DISCO FUNK',
+      descKey: 'song_2_desc',
+      audioUrl: './assets/audio/tracks/10_velvet_nu_disco.ogg',
+      bgUrl: './assets/screens/bg_02_cyber_club.png',
+      colors: ['#f59e0b', '#ec4899'],
+      badge: '10',
+      style: 'disco'
+    },
+    {
+      id: 'hardstyle_inferno',
+      title: 'Hardstyle Inferno',
+      bpm: 155,
+      duration: 80.5,
+      lengthText: '01:21',
+      artist: 'REDLINE · HARDSTYLE RAVE',
+      descKey: 'song_4_desc',
+      audioUrl: './assets/audio/tracks/11_hardstyle_inferno.ogg',
+      bgUrl: './assets/screens/bg_05_quantum_arena.png',
+      colors: ['#ff1e42', '#ff7b00'],
+      badge: '11',
+      style: 'hardstyle'
+    },
+    {
+      id: 'vip_trap_anthem',
+      title: 'VIP Trap Anthem',
+      bpm: 140,
+      duration: 75.4,
+      lengthText: '01:15',
+      artist: 'CROWN VIP · FESTIVAL TRAP',
+      descKey: 'song_4_desc',
+      audioUrl: './assets/audio/tracks/12_vip_trap_anthem.ogg',
+      bgUrl: './assets/screens/bg_05_quantum_arena.png',
+      colors: ['#10b981', '#fde047'],
+      badge: '12',
+      style: 'trap'
     }
   ];
-
-  function midiOffsetToFreq(baseFreq, semitones) {
-    return baseFreq * Math.pow(2, semitones / 12);
-  }
 
   function seededRandom(seed) {
     let s = seed % 2147483647;
@@ -110,13 +190,12 @@
     return (h >>> 0).toString(36);
   }
 
-  class AudioSynthEngine {
+  class AudioTrackEngine {
     constructor() {
       this.ctx = null;
       this.bgmGain = null;
       this.previewGain = null;
       this.sfxGain = null;
-      this.reverbSend = null;
       this.bgmVolume = 0.75;
       this.sfxVolume = 0.85;
 
@@ -125,15 +204,15 @@
       this.currentSong = null;
       this.songStartCtxTime = 0;
       this.pausedElapsed = 0;
-      this.schedulerTimer = null;
-      this.nextStepIndex = 0;
-      this.customSourceNode = null;
+      this.resumeBaseElapsed = 0;
+      this.resumeAnchorCtxTime = 0;
+      this.activeSourceNode = null;
       this.voices = new Set();
 
-      this.previewTimer = null;
-      this.previewStep = 0;
+      this.trackBufferCache = new Map();
       this.previewRequest = 0;
-      this.previewCustomNode = null;
+      this.previewNode = null;
+      this.startRequest = 0;
     }
 
     ensureContext() {
@@ -146,15 +225,14 @@
         this.sfxGain = this.ctx.createGain();
 
         this.bgmGain.gain.value = this.bgmVolume;
-        this.previewGain.gain.value = this.bgmVolume * 0.34;
+        this.previewGain.gain.value = this.bgmVolume * 0.42;
         this.sfxGain.gain.value = this.sfxVolume;
 
-        // Master Studio Polish: Compressor + Lush Stereo Reverb Send (gracefully skipped in minimal test mocks)
         let masterOut = this.ctx.destination;
         if (typeof this.ctx.createDynamicsCompressor === 'function') {
           const comp = this.ctx.createDynamicsCompressor();
-          comp.threshold.setValueAtTime(-14, this.ctx.currentTime);
-          comp.ratio.setValueAtTime(3.5, this.ctx.currentTime);
+          comp.threshold.setValueAtTime(-12, this.ctx.currentTime);
+          comp.ratio.setValueAtTime(3.0, this.ctx.currentTime);
           comp.connect(this.ctx.destination);
           masterOut = comp;
         }
@@ -162,26 +240,6 @@
         this.bgmGain.connect(masterOut);
         this.previewGain.connect(masterOut);
         this.sfxGain.connect(masterOut);
-
-        if (typeof this.ctx.createConvolver === 'function' && this.ctx.sampleRate >= 22050) {
-          try {
-            const len = Math.floor(this.ctx.sampleRate * 1.1);
-            const ir = this.ctx.createBuffer(2, len, this.ctx.sampleRate);
-            for (let ch = 0; ch < 2; ch++) {
-              const d = ir.getChannelData(ch);
-              for (let i = 0; i < len; i++) {
-                d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.8);
-              }
-            }
-            const conv = this.ctx.createConvolver();
-            conv.buffer = ir;
-            const revGain = this.ctx.createGain();
-            revGain.gain.value = 0.22;
-            conv.connect(revGain);
-            revGain.connect(masterOut);
-            this.reverbSend = conv;
-          } catch (_) {}
-        }
       }
       if (this.ctx.state === 'suspended') {
         this.ctx.resume().catch(() => {});
@@ -220,300 +278,77 @@
         this.bgmGain.gain.setValueAtTime(this.bgmVolume, this.ctx.currentTime);
       }
       if (this.previewGain && this.ctx) {
-        this.previewGain.gain.setValueAtTime(this.bgmVolume * 0.34, this.ctx.currentTime);
+        this.previewGain.gain.setValueAtTime(this.bgmVolume * 0.42, this.ctx.currentTime);
       }
       if (this.sfxGain && this.ctx) {
         this.sfxGain.gain.setValueAtTime(this.sfxVolume, this.ctx.currentTime);
       }
     }
 
-    // ==================== MODERN STUDIO INSTRUMENTS ====================
-    triggerKick(time, dest, punch = 1.0) {
-      // Sub-punch kick + transient click
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(168 * punch, time);
-      osc.frequency.exponentialRampToValueAtTime(42, time + 0.09);
-      osc.frequency.exponentialRampToValueAtTime(31, time + 0.21);
-
-      gain.gain.setValueAtTime(0.78, time);
-      gain.gain.exponentialRampToValueAtTime(0.001, time + 0.22);
-
-      osc.connect(gain);
-      gain.connect(dest);
-      this._trackVoice(osc, dest, [gain]);
-      osc.start(time);
-      osc.stop(time + 0.23);
-    }
-
-    triggerSnare(time, dest) {
-      // Layered modern K-Pop / EDM Clap-Snare
-      const bufferSize = Math.max(16, Math.floor(this.ctx.sampleRate * 0.16));
-      const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-      const data = buffer.getChannelData(0);
-      for (let i = 0; i < bufferSize; i++) {
-        // Double clap pre-transient envelope
-        const env = (i < bufferSize * 0.08) ? 0.75 : Math.exp(-i / (bufferSize * 0.3));
-        data[i] = (Math.random() * 2 - 1) * env;
+    async loadTrackBuffer(song) {
+      if (!song) return null;
+      if (song.audioBuffer) return song.audioBuffer;
+      if (!song.audioUrl || typeof fetch !== 'function') return null;
+      if (this.trackBufferCache.has(song.id)) {
+        return this.trackBufferCache.get(song.id);
       }
-      const noise = this.ctx.createBufferSource();
-      noise.buffer = buffer;
-
-      const filter = this.ctx.createBiquadFilter();
-      filter.type = 'bandpass';
-      filter.frequency.setValueAtTime(1850, time);
-
-      const gain = this.ctx.createGain();
-      gain.gain.setValueAtTime(0.42, time);
-      gain.gain.exponentialRampToValueAtTime(0.001, time + 0.16);
-
-      noise.connect(filter);
-      filter.connect(gain);
-      gain.connect(dest);
-      if (this.reverbSend && dest === this.bgmGain) gain.connect(this.reverbSend);
-      this._trackVoice(noise, dest, [filter, gain]);
-      noise.start(time);
-
-      // Punchy 200Hz snare body pop
-      const body = this.ctx.createOscillator();
-      const bGain = this.ctx.createGain();
-      body.type = 'triangle';
-      body.frequency.setValueAtTime(220, time);
-      body.frequency.exponentialRampToValueAtTime(110, time + 0.07);
-      bGain.gain.setValueAtTime(0.24, time);
-      bGain.gain.exponentialRampToValueAtTime(0.001, time + 0.08);
-      body.connect(bGain);
-      bGain.connect(dest);
-      this._trackVoice(body, dest, [bGain]);
-      body.start(time);
-      body.stop(time + 0.09);
+      const ctx = this.ensureContext();
+      const res = await fetch(song.audioUrl);
+      if (!res.ok) throw new Error(`Audio fetch failed: ${song.audioUrl}`);
+      const arrBuf = await res.arrayBuffer();
+      const decoded = await ctx.decodeAudioData(arrBuf.slice(0));
+      song.audioBuffer = decoded;
+      this.trackBufferCache.set(song.id, decoded);
+      return decoded;
     }
 
-    triggerHiHat(time, dest, open = false) {
-      const dur = open ? 0.13 : 0.042;
-      const bufferSize = Math.max(16, Math.floor(this.ctx.sampleRate * dur));
-      const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-      const data = buffer.getChannelData(0);
-      for (let i = 0; i < bufferSize; i++) {
-        data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.25));
-      }
-      const noise = this.ctx.createBufferSource();
-      noise.buffer = buffer;
-
-      const filter = this.ctx.createBiquadFilter();
-      filter.type = 'highpass';
-      filter.frequency.setValueAtTime(7500, time);
-
-      const gain = this.ctx.createGain();
-      gain.gain.setValueAtTime(open ? 0.17 : 0.11, time);
-      gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
-
-      noise.connect(filter);
-      filter.connect(gain);
-      gain.connect(dest);
-      this._trackVoice(noise, dest, [filter, gain]);
-      noise.start(time);
-    }
-
-    triggerBass(time, freq, dur, dest, style = 'kpop_house') {
-      // Deep 808 Sub + Slap House / Reese harmonic layer
-      const sub = this.ctx.createOscillator();
-      const top = this.ctx.createOscillator();
-      const filter = this.ctx.createBiquadFilter();
-      const gain = this.ctx.createGain();
-
-      sub.type = 'sine';
-      sub.frequency.setValueAtTime(freq * 0.5, time);
-
-      top.type = style === 'jersey_ukg' ? 'triangle' : 'sawtooth';
-      top.frequency.setValueAtTime(freq * (style === 'liquid_dnb' ? 0.503 : 1.0), time);
-
-      filter.type = 'lowpass';
-      const startCut = style === 'kpop_house' ? 1450 : (style === 'drift_phonk' ? 1800 : 720);
-      filter.frequency.setValueAtTime(startCut, time);
-      filter.frequency.exponentialRampToValueAtTime(160, time + dur);
-
-      gain.gain.setValueAtTime(0.32, time);
-      gain.gain.exponentialRampToValueAtTime(0.008, time + dur);
-
-      top.connect(filter);
-      filter.connect(gain);
-      sub.connect(gain);
-      gain.connect(dest);
-
-      this._trackVoice(sub, dest);
-      this._trackVoice(top, dest, [filter, gain]);
-      sub.start(time);
-      top.start(time);
-      sub.stop(time + dur + 0.01);
-      top.stop(time + dur + 0.01);
-    }
-
-    triggerChordPad(time, baseFreq, chordOffsets, dur, dest, style = 'kpop_house') {
-      // Lush Sidechained Supersaw / Rhodes 9th Chords (The heart of modern K-Pop & UKG!)
-      const filter = this.ctx.createBiquadFilter();
-      const gain = this.ctx.createGain();
-
-      filter.type = 'lowpass';
-      filter.frequency.setValueAtTime(style === 'jersey_ukg' ? 1900 : 2800, time);
-
-      // Sidechain pumping envelope (ducks on the beat, swells up right after!)
-      gain.gain.setValueAtTime(0.015, time);
-      if (typeof gain.gain.linearRampToValueAtTime === 'function') {
-        gain.gain.linearRampToValueAtTime(0.11, time + Math.min(0.09, dur * 0.4));
-      } else {
-        gain.gain.setValueAtTime(0.10, time + 0.05);
-      }
-      gain.gain.exponentialRampToValueAtTime(0.006, time + dur);
-
-      filter.connect(gain);
-      gain.connect(dest);
-      if (this.reverbSend && dest === this.bgmGain) gain.connect(this.reverbSend);
-
-      chordOffsets.forEach((semi, idx) => {
-        const osc = this.ctx.createOscillator();
-        osc.type = style === 'jersey_ukg' ? 'triangle' : 'sawtooth';
-        const f = midiOffsetToFreq(baseFreq, semi + 12);
-        osc.frequency.setValueAtTime(f * (1 + (idx - 1.5) * 0.0035), time);
-        osc.connect(filter);
-        this._trackVoice(osc, dest, idx === 0 ? [filter, gain] : []);
-        osc.start(time);
-        osc.stop(time + dur + 0.01);
-      });
-    }
-
-    triggerLead(time, freq, dur, dest, bright = false, style = 'kpop_house') {
-      if (style === 'drift_phonk') {
-        // Authentic Viral Drift Phonk 808 Cowbell Lead (540Hz/800Hz ratio metallic dual-square!)
-        const o1 = this.ctx.createOscillator();
-        const o2 = this.ctx.createOscillator();
-        const bp = this.ctx.createBiquadFilter();
-        const gain = this.ctx.createGain();
-
-        o1.type = 'square';
-        o2.type = 'square';
-        o1.frequency.setValueAtTime(freq * 2, time);
-        o2.frequency.setValueAtTime(freq * 2 * 1.481, time);
-
-        bp.type = 'bandpass';
-        bp.frequency.setValueAtTime(bright ? 2400 : 1750, time);
-
-        gain.gain.setValueAtTime(0.18, time);
-        gain.gain.exponentialRampToValueAtTime(0.003, time + dur * 0.85);
-
-        o1.connect(bp);
-        o2.connect(bp);
-        bp.connect(gain);
-        gain.connect(dest);
-        if (this.reverbSend && dest === this.bgmGain) gain.connect(this.reverbSend);
-
-        this._trackVoice(o1, dest);
-        this._trackVoice(o2, dest, [bp, gain]);
-        o1.start(time);
-        o2.start(time);
-        o1.stop(time + dur);
-        o2.stop(time + dur);
-        return;
-      }
-
-      // Modern Formant Vocal-Chop / Glossy K-Pop Synth Pluck Lead
-      const osc1 = this.ctx.createOscillator();
-      const osc2 = this.ctx.createOscillator();
-      const filter = this.ctx.createBiquadFilter();
-      const gain = this.ctx.createGain();
-
-      osc1.type = style === 'jersey_ukg' ? 'sine' : 'sawtooth';
-      osc2.type = 'triangle';
-
-      // Subtle pitch-glide pop ornament at note attack
-      osc1.frequency.setValueAtTime(freq * 0.985, time);
-      osc1.frequency.exponentialRampToValueAtTime(freq * 2, time + 0.025);
-      osc2.frequency.setValueAtTime(freq * 2.006, time);
-
-      filter.type = bright ? 'bandpass' : 'lowpass';
-      filter.frequency.setValueAtTime(bright ? 2600 : 3200, time);
-      filter.frequency.exponentialRampToValueAtTime(950, time + dur);
-
-      gain.gain.setValueAtTime(0.16, time);
-      gain.gain.exponentialRampToValueAtTime(0.004, time + dur);
-
-      osc1.connect(filter);
-      osc2.connect(filter);
-      filter.connect(gain);
-      gain.connect(dest);
-      if (this.reverbSend && dest === this.bgmGain) gain.connect(this.reverbSend);
-
-      this._trackVoice(osc1, dest);
-      this._trackVoice(osc2, dest, [filter, gain]);
-      osc1.start(time);
-      osc2.start(time);
-      osc1.stop(time + dur + 0.01);
-      osc2.stop(time + dur + 0.01);
-    }
-
-    // ==================== LOBBY PREVIEW ====================
+    // ==================== LOBBY PREVIEW (CROSSFADE REAL OGG DROP) ====================
     async startLobbyPreview(song) {
       this.stopLobbyPreview();
-      const request = this.previewRequest;
+      const req = ++this.previewRequest;
       if (!song) return;
       try { await this.prepare(); } catch (_) { return; }
-      if (request !== this.previewRequest || this.isPlaying) return;
+      if (req !== this.previewRequest || this.isPlaying) return;
 
-      if (song.isCustom && song.audioBuffer) {
-        if (this.ctx.state !== 'running') return;
-        const src = this.ctx.createBufferSource();
-        src.buffer = song.audioBuffer;
-        src.loop = true;
-        src.loopStart = 0;
-        src.loopEnd = Math.min(15, song.audioBuffer.duration);
-        src.connect(this.previewGain);
-        this._trackVoice(src, this.previewGain);
-        src.start(0);
-        this.previewCustomNode = src;
-        return;
+      let buf = null;
+      try { buf = await this.loadTrackBuffer(song); } catch (_) { return; }
+      if (!buf || req !== this.previewRequest || this.isPlaying || this.ctx.state !== 'running') return;
+
+      const src = this.ctx.createBufferSource();
+      const fade = this.ctx.createGain();
+      src.buffer = buf;
+      src.loop = true;
+      // Preview starts right at the main drop (~28% into the track) for instant excitement
+      const dropOffset = song.isCustom ? 0 : Math.min(Math.max(0, buf.duration * 0.28), Math.max(0, buf.duration - 16));
+      src.loopStart = dropOffset;
+      src.loopEnd = Math.min(buf.duration, dropOffset + 16);
+
+      const now = this.ctx.currentTime;
+      fade.gain.setValueAtTime(0.001, now);
+      if (typeof fade.gain.linearRampToValueAtTime === 'function') {
+        fade.gain.linearRampToValueAtTime(1.0, now + 0.35);
+      } else {
+        fade.gain.setValueAtTime(1.0, now);
       }
 
-      const stepMs = (60 / song.bpm / 2) * 1000;
-      const eighthDur = 60 / song.bpm / 2;
-      this.previewStep = 0;
-      this.previewTimer = setInterval(() => {
-        if (!this.ctx || this.ctx.state !== 'running' || this.isPlaying) return;
-        const now = this.ctx.currentTime + 0.02;
-        const s = this.previewStep++;
-        const barIdx = Math.floor(s / 8) % (song.chords ? song.chords.length : 4);
-        const chord = song.chords ? song.chords[barIdx] : [0, 3, 7, 10];
-        const rootSemi = chord[0];
-        const barRoot = midiOffsetToFreq(song.rootFreq, rootSemi);
-
-        if (s % 2 === 0) {
-          this.triggerKick(now, this.previewGain, 0.9);
-          this.triggerChordPad(now, song.rootFreq, chord, eighthDur * 1.9, this.previewGain, song.style);
-        }
-        if (s % 2 === 1) this.triggerHiHat(now, this.previewGain, false);
-        if (s % 4 === 2) this.triggerSnare(now, this.previewGain);
-
-        const noteIdx = song.melodyPattern[s % song.melodyPattern.length];
-        const semi = song.scale[noteIdx % song.scale.length];
-        this.triggerLead(now, midiOffsetToFreq(barRoot, semi), eighthDur * 0.92, this.previewGain, true, song.style);
-      }, stepMs);
+      src.connect(fade);
+      fade.connect(this.previewGain);
+      this._trackVoice(src, this.previewGain, [fade]);
+      src.start(now, dropOffset);
+      this.previewNode = src;
     }
 
     stopLobbyPreview() {
       this.previewRequest++;
       this._stopVoices(this.previewGain);
-      if (this.previewTimer) {
-        clearInterval(this.previewTimer);
-        this.previewTimer = null;
-      }
-      if (this.previewCustomNode) {
-        try { this.previewCustomNode.stop(); } catch (_) {}
-        this.previewCustomNode.disconnect();
-        this.previewCustomNode = null;
+      if (this.previewNode) {
+        try { this.previewNode.stop(); } catch (_) {}
+        try { this.previewNode.disconnect(); } catch (_) {}
+        this.previewNode = null;
       }
     }
 
-    // ==================== GAMEPLAY PLAYBACK & SEQUENCER ====================
+    // ==================== GAMEPLAY PLAYBACK (REAL OGG / CUSTOM MP3) ====================
     startSong(song) {
       this.stopLobbyPreview();
       this.stopSong();
@@ -524,113 +359,43 @@
       this.isPaused = false;
       this.pausedElapsed = 0;
       this.resumeBaseElapsed = 0;
-      this.resumeAnchorCtxTime = this.ctx.currentTime + 0.08;
-      this.nextStepIndex = 0;
-      this.songStartCtxTime = this.ctx.currentTime + 0.08;
+      const req = ++this.startRequest;
+      const startAt = this.ctx.currentTime + 0.04;
+      this.resumeAnchorCtxTime = startAt;
+      this.songStartCtxTime = startAt;
 
-      if (song.isCustom && song.audioBuffer) {
-        this._startCustomBuffer(0);
-      } else {
-        this._startSynthScheduler();
+      if (song.audioBuffer) {
+        this._startAudioBuffer(song.audioBuffer, 0);
+      } else if (song.audioUrl && typeof fetch === 'function') {
+        this.loadTrackBuffer(song).then(buf => {
+          if (!buf || req !== this.startRequest || !this.isPlaying || this.isPaused) return;
+          const elapsed = this.getSongTime();
+          this._startAudioBuffer(buf, elapsed);
+        }).catch(() => {});
       }
     }
 
-    _startCustomBuffer(offsetSec) {
-      if (!this.currentSong || !this.currentSong.audioBuffer) return;
+    _startAudioBuffer(buffer, offsetSec) {
+      if (!buffer || !this.ctx) return;
       this._stopVoices(this.bgmGain);
       const src = this.ctx.createBufferSource();
-      src.buffer = this.currentSong.audioBuffer;
-      src.connect(this.bgmGain);
+      const fade = this.ctx.createGain();
+      src.buffer = buffer;
+
       const startAt = this.ctx.currentTime + 0.04;
-      this.songStartCtxTime = startAt - offsetSec;
-      this._trackVoice(src, this.bgmGain);
-      src.start(startAt, Math.min(offsetSec, src.buffer.duration));
-      this.customSourceNode = src;
-    }
-
-    _startSynthScheduler() {
-      const song = this.currentSong;
-      const sixteenthDur = 60 / song.bpm / 4;
-
-      const scheduleTick = () => {
-        if (!this.isPlaying || this.isPaused || !this.currentSong) return;
-        const lookAhead = 0.16;
-        const minStep = Math.max(0, Math.ceil((this.ctx.currentTime - this.songStartCtxTime - 0.015) / sixteenthDur));
-        this.nextStepIndex = Math.max(this.nextStepIndex, minStep);
-
-        while (this.songStartCtxTime + this.nextStepIndex * sixteenthDur < this.ctx.currentTime + lookAhead) {
-          const stepTime = this.songStartCtxTime + this.nextStepIndex * sixteenthDur;
-          const elapsed = this.nextStepIndex * sixteenthDur;
-          if (elapsed <= song.duration) {
-            this._scheduleSynthStep(song, this.nextStepIndex, stepTime, sixteenthDur);
-          }
-          this.nextStepIndex++;
-        }
-      };
-
-      scheduleTick();
-      this.schedulerTimer = setInterval(scheduleTick, 40);
-    }
-
-    _scheduleSynthStep(song, step, time, sixteenthDur) {
-      const barStep = step % 16;
-      const barNum = Math.floor(step / 16);
-      const isClimax = barNum >= 6;
-      const style = song.style || 'kpop_house';
-      const chords = song.chords || [[0, 3, 7, 10], [-4, 0, 3, 8], [3, 7, 10, 15], [-2, 2, 5, 7]];
-      const chord = chords[barNum % chords.length];
-      const rootFreq = midiOffsetToFreq(song.rootFreq, chord[0]);
-
-      // 1. Genre-Authentic Modern Drum Grooves
-      if (style === 'jersey_ukg') {
-        // Trendy Jersey Club 5-kick bounce: 0, 4, 8, 11, 14!
-        if (barStep === 0 || barStep === 4 || barStep === 8 || barStep === 11 || barStep === 14) {
-          this.triggerKick(time, this.bgmGain, 1.08);
-        }
-        if (barStep === 4 || barStep === 12) this.triggerSnare(time, this.bgmGain);
-      } else if (style === 'liquid_dnb') {
-        // Authentic Liquid Drum & Bass Two-Step Breakbeat: Kick on 0 & 10, Snare on 4 & 12!
-        if (barStep === 0 || barStep === 10) {
-          this.triggerKick(time, this.bgmGain, 1.1);
-        }
-        if (barStep === 4 || barStep === 12 || (isClimax && barStep === 15)) {
-          this.triggerSnare(time, this.bgmGain);
-        }
+      fade.gain.setValueAtTime(0.01, startAt);
+      if (typeof fade.gain.linearRampToValueAtTime === 'function') {
+        fade.gain.linearRampToValueAtTime(1.0, startAt + 0.08);
       } else {
-        // K-Pop Slap House & Drift Phonk punchy 4-on-the-floor + syncopated drop kicks
-        if (barStep % 4 === 0 || (isClimax && barStep === 14)) {
-          this.triggerKick(time, this.bgmGain, isClimax ? 1.15 : 1.02);
-        }
-        if (barStep === 4 || barStep === 12) {
-          this.triggerSnare(time, this.bgmGain);
-        }
+        fade.gain.setValueAtTime(1.0, startAt);
       }
 
-      // 2. Crisp Off-Beat Hi-Hats & Trap 16th Stutter Rolls (keeps step 2 -> triggerHiHat contract!)
-      if (barStep % 4 === 2) {
-        this.triggerHiHat(time, this.bgmGain, barStep === 10);
-      } else if (isClimax && (barStep % 2 === 1 || barStep === 6 || barStep === 14)) {
-        this.triggerHiHat(time, this.bgmGain, false);
-      }
-
-      // 3. Lush Sidechained Chords on Quarter Beats
-      if (barStep % 4 === 0) {
-        this.triggerChordPad(time, song.rootFreq, chord, sixteenthDur * 3.8, this.bgmGain, style);
-      }
-
-      // 4. Modern Bouncy Bassline (Offbeat Slap / 808 Glide / Reese)
-      if (barStep === 0 || barStep === 3 || barStep === 6 || barStep === 8 || barStep === 10 || barStep === 14) {
-        const oct = (barStep === 6 || barStep === 14) ? 12 : 0;
-        this.triggerBass(time, midiOffsetToFreq(rootFreq, oct), sixteenthDur * 2.1, this.bgmGain, style);
-      }
-
-      // 5. Catchy Vocal-Chop / Pluck / Phonk Cowbell Hook Melody
-      if (barStep % 2 === 0 || barStep === 3 || (isClimax && barStep === 11)) {
-        const patIdx = Math.floor((step / 2) % song.melodyPattern.length);
-        const scaleDeg = song.melodyPattern[patIdx];
-        const semi = song.scale[scaleDeg % song.scale.length];
-        this.triggerLead(time, midiOffsetToFreq(rootFreq, semi), sixteenthDur * 1.85, this.bgmGain, isClimax, style);
-      }
+      src.connect(fade);
+      fade.connect(this.bgmGain);
+      this.songStartCtxTime = startAt - offsetSec;
+      this._trackVoice(src, this.bgmGain, [fade]);
+      src.start(startAt, Math.min(Math.max(0, offsetSec), Math.max(0, buffer.duration - 0.05)));
+      this.activeSourceNode = src;
     }
 
     getSongTime() {
@@ -646,12 +411,8 @@
       if (!this.isPlaying || this.isPaused) return;
       this.pausedElapsed = this.getSongTime();
       this.isPaused = true;
-      if (this.schedulerTimer) {
-        clearInterval(this.schedulerTimer);
-        this.schedulerTimer = null;
-      }
       this._stopVoices(this.bgmGain);
-      this.customSourceNode = null;
+      this.activeSourceNode = null;
     }
 
     resumeSong() {
@@ -659,28 +420,21 @@
       this.ensureContext();
       this.isPaused = false;
       this.resumeBaseElapsed = this.pausedElapsed;
-      if (this.currentSong && this.currentSong.isCustom && this.currentSong.audioBuffer) {
-        this.resumeAnchorCtxTime = this.ctx.currentTime + 0.04;
-        this._startCustomBuffer(this.pausedElapsed);
+      this.resumeAnchorCtxTime = this.ctx.currentTime + 0.04;
+      if (this.currentSong && this.currentSong.audioBuffer) {
+        this._startAudioBuffer(this.currentSong.audioBuffer, this.pausedElapsed);
       } else {
-        this.resumeAnchorCtxTime = this.ctx.currentTime;
-        const sixteenthDur = 60 / this.currentSong.bpm / 4;
-        this.songStartCtxTime = this.ctx.currentTime - this.pausedElapsed;
-        this.nextStepIndex = Math.ceil(this.pausedElapsed / sixteenthDur);
-        this._startSynthScheduler();
+        this.songStartCtxTime = this.ctx.currentTime + 0.04 - this.pausedElapsed;
       }
     }
 
     stopSong() {
+      this.startRequest++;
       this.isPlaying = false;
       this.isPaused = false;
       this.pausedElapsed = 0;
-      if (this.schedulerTimer) {
-        clearInterval(this.schedulerTimer);
-        this.schedulerTimer = null;
-      }
       this._stopVoices(this.bgmGain);
-      this.customSourceNode = null;
+      this.activeSourceNode = null;
     }
 
     _readDuration(file) {
@@ -754,8 +508,9 @@
         lengthText,
         artist: I18n.t('custom_track_badge'),
         descKey: usedFallbackGrid ? 'custom_grid_hint' : 'upload_mp3',
+        bgUrl: './assets/screens/bg_05_quantum_arena.png',
         colors: ['#ffd84d', '#00f2ff'],
-        icon: '🎧',
+        badge: 'MP3',
         isCustom: true,
         audioBuffer,
         customPeaks
@@ -767,14 +522,19 @@
       return customSong;
     }
 
-    // ==================== BEATMAP / CHART GENERATOR ====================
+    // ==================== BPM-SYNCED BEATMAP + 8-BEAT RUSH BARRAGE + SLOW-MO FINISH ====================
     generateChart(song, difficulty) {
-      const rand = seededRandom(song.title.length * 997 + difficulty.charCodeAt(0) * 131);
+      const rand = seededRandom(song.title.length * 997 + difficulty.charCodeAt(0) * 131 + Math.round(song.bpm));
       const beatSec = 60 / song.bpm;
-      const branchStart = Math.min(22, song.duration * 0.34);
+      const branchStart = Math.min(24, song.duration * 0.34);
       const branchDecision = branchStart + 3.2;
-      const branchEnd = Math.min(song.duration - 10, branchDecision + 18);
+      const branchEnd = Math.min(song.duration - 12, branchDecision + 18);
       const hasBranch = difficulty !== 'EASY' && song.duration >= 36 && branchEnd > branchDecision + 4;
+
+      // Highlight Drop 8-beat RUSH BARRAGE window (synced to bar 16 drop!)
+      const rushStart = Math.min(song.duration - 8, Math.max(beatSec * 32, song.duration * 0.52));
+      const rushEnd = Math.min(song.duration - 4, rushStart + beatSec * 8);
+      const slowMoStart = Math.max(0, song.duration - 2.6);
 
       const notes = [];
       let currentLane = 1;
@@ -798,6 +558,7 @@
             lane: currentLane,
             type,
             branch: inBranch ? 'both' : 'main',
+            isRushBarrage: t >= rushStart && t <= rushEnd,
             hit: false
           });
         });
@@ -811,9 +572,13 @@
         for (let t = startT; t <= endT; t += stepSec, stepIdx++) {
           if (hasBranch && Math.abs(t - branchDecision) < 0.65) continue;
 
+          const inRushBarrage = (t >= rushStart && t <= rushEnd);
           const onMainBeat = (stepIdx % stepDiv === 0);
           let shouldPlace = false;
-          if (difficulty === 'EASY') {
+          if (inRushBarrage) {
+            // 8-beat highlight Rush Barrage: dense rhythmic stream!
+            shouldPlace = (difficulty === 'EASY') ? onMainBeat : true;
+          } else if (difficulty === 'EASY') {
             shouldPlace = (stepIdx % 1 === 0) && (stepIdx % 8 !== 7);
           } else if (difficulty === 'NORMAL') {
             shouldPlace = onMainBeat || (stepIdx % 8 === 5);
@@ -825,14 +590,19 @@
 
           if (!shouldPlace) continue;
 
-          if (rand() < (difficulty === 'EASY' ? 0.35 : 0.55)) {
+          if (inRushBarrage) {
+            // Alternating left-center-right fever sweep during Rush Barrage
+            currentLane = (stepIdx % 3);
+          } else if (rand() < (difficulty === 'EASY' ? 0.35 : 0.55)) {
             const delta = rand() < 0.5 ? -1 : 1;
             currentLane = Math.max(0, Math.min(2, currentLane + delta));
           }
 
           let type = 'tap';
           const swipeChance = difficulty === 'EASY' ? 0.06 : (difficulty === 'NORMAL' ? 0.2 : (difficulty === 'HARD' ? 0.3 : 0.36));
-          if (onMainBeat && rand() < swipeChance) {
+          if (inRushBarrage && stepIdx % 4 === 0 && difficulty !== 'EASY') {
+            type = (stepIdx % 8 === 0) ? 'swipeL' : 'swipeR';
+          } else if (onMainBeat && rand() < swipeChance) {
             type = (currentLane === 0) ? 'swipeR' : (currentLane === 2 ? 'swipeL' : (rand() < 0.5 ? 'swipeL' : 'swipeR'));
           }
 
@@ -843,25 +613,28 @@
             lane: currentLane,
             type,
             branch: inBranch ? 'both' : 'main',
+            isRushBarrage: inRushBarrage,
             hit: false
           });
 
-          if (inBranch && onMainBeat && difficulty !== 'EASY') {
+          if (inBranch && onMainBeat && difficulty !== 'EASY' && !inRushBarrage) {
             notes.push({
               id: 0,
               time: Number((t + stepSec * 0.5).toFixed(3)),
               lane: (currentLane + 1) % 3,
               type: 'tap',
               branch: 'rush_only',
+              isRushBarrage: false,
               hit: false
             });
-          } else if (difficulty === 'EXTREME' && onMainBeat && stepIdx % 4 === 2) {
+          } else if (difficulty === 'EXTREME' && onMainBeat && stepIdx % 4 === 2 && !inRushBarrage) {
             notes.push({
               id: 0,
               time: Number((t + beatSec * 0.25).toFixed(3)),
               lane: currentLane,
               type: 'tap',
               branch: inBranch ? 'both' : 'main',
+              isRushBarrage: false,
               hit: false
             });
           }
@@ -875,11 +648,14 @@
         hasBranch,
         branchStart: hasBranch ? branchStart : 9999,
         branchDecision: hasBranch ? branchDecision : 9999,
-        branchEnd: hasBranch ? branchEnd : 9999
+        branchEnd: hasBranch ? branchEnd : 9999,
+        rushStart,
+        rushEnd,
+        slowMoStart
       };
     }
 
-    // ==================== GAMEPLAY & UI SFX ====================
+    // ==================== TACTILE GAMEPLAY & UI SFX ====================
     playHitSfx(type = 'tap', isFever = false) {
       try {
         this.ensureContext();
@@ -988,5 +764,5 @@
     }
   }
 
-  window.AudioEngine = new AudioSynthEngine();
+  window.AudioEngine = new AudioTrackEngine();
 })();

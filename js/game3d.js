@@ -41,6 +41,16 @@
 
   window.CHAR_SPECS = CHAR_SPECS;
 
+  const SABER_SKINS = {
+    neon_plasma:   { id: 'neon_plasma',   name: '네온 플라즈마',   cost: 0,    primary: 0x00f2ff, secondary: 0xff2bd6, rainbow: false },
+    gold_dragon:   { id: 'gold_dragon',   name: '골드 드래곤',     cost: 400,  primary: 0xffd84d, secondary: 0xff7b00, rainbow: false },
+    rainbow_prism: { id: 'rainbow_prism', name: '레인보우 프리즘', cost: 600,  primary: 0x00ffcc, secondary: 0xff33cc, rainbow: true  },
+    cyber_katana:  { id: 'cyber_katana',  name: '사이버 카타나',   cost: 800,  primary: 0x38bdf8, secondary: 0xe0f2fe, rainbow: false },
+    blood_ruby:    { id: 'blood_ruby',    name: '블러드 루비',     cost: 1000, primary: 0xff1e42, secondary: 0xff758f, rainbow: false },
+    ice_crystal:   { id: 'ice_crystal',   name: '아이스 크리스탈', cost: 1200, primary: 0x7dd3fc, secondary: 0xffffff, rainbow: false }
+  };
+  window.SABER_SKINS = SABER_SKINS;
+
   // Procedural fallback canvas textures so WebGL works cleanly even on strict file:// protocol
   function makeOrbFallbackTexture() {
     const c = document.createElement('canvas');
@@ -429,24 +439,48 @@
       groundDisc.renderOrder = 3;
       this.runnerGroup.add(shadowDisc, groundDisc);
 
-      // High-Res Anime Cyberpunk Back-View Runner Sprites (Luna / Kai / Aria — ZERO Sphere/Box Stickman!)
+      // High-Res 5-Pose Transparent RGBA Runner Sprites (Luna / Kai / Aria: run1, run2, slash_l, slash_r, slash_x)
       const loader = new THREE.TextureLoader();
-      this.runnerBackTextures = {
-        luna: loader.load('./assets/characters/runner_luna_back.png'),
-        kai:  loader.load('./assets/characters/runner_kai_back.png'),
-        aria: loader.load('./assets/characters/runner_aria_back.png'),
-      };
+      this.runnerPoseTextures = {};
+      for (const cid of ['luna', 'kai', 'aria']) {
+        this.runnerPoseTextures[cid] = {
+          run1:    loader.load(`./assets/characters/runner_${cid}_run1.png`),
+          run2:    loader.load(`./assets/characters/runner_${cid}_run2.png`),
+          slash_l: loader.load(`./assets/characters/runner_${cid}_slash_l.png`),
+          slash_r: loader.load(`./assets/characters/runner_${cid}_slash_r.png`),
+          slash_x: loader.load(`./assets/characters/runner_${cid}_slash_x.png`)
+        };
+      }
+      this.currentRunnerPose = 'run1';
+      this.lastSlashPose = 'slash_l';
+      this.saberSkinSpec = SABER_SKINS.neon_plasma;
+
       this.runnerSpriteMat = new THREE.SpriteMaterial({
-        map: this.runnerBackTextures.luna,
+        map: this.runnerPoseTextures.luna.run1,
         transparent: true,
-        alphaTest: 0.05,
+        alphaTest: 0.04,
         depthWrite: false
       });
       this.runnerSprite = new THREE.Sprite(this.runnerSpriteMat);
-      this.runnerSprite.scale.set(3.25, 3.25, 1);
-      this.runnerSprite.position.set(0, 1.58, 0);
+      this.runnerSprite.scale.set(3.35, 3.35, 1);
+      this.runnerSprite.position.set(0, 1.62, 0);
       this.runnerSprite.renderOrder = 8;
       this.runnerGroup.add(this.runnerSprite);
+
+      // 3D Neon Crescent Slash Arc VFX Mesh (colored by equipped Saber Skin!)
+      const arcGeo = new THREE.RingGeometry(1.15, 1.95, 28, 1, -Math.PI * 0.42, Math.PI * 0.84);
+      this.slashArcMat = new THREE.MeshBasicMaterial({
+        color: 0x00f2ff,
+        transparent: true,
+        opacity: 0,
+        side: THREE.DoubleSide,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+      });
+      this.slashArcMesh = new THREE.Mesh(arcGeo, this.slashArcMat);
+      this.slashArcMesh.position.set(0, 1.35, -0.55);
+      this.slashArcMesh.renderOrder = 9;
+      this.runnerGroup.add(this.slashArcMesh);
 
       // Dummy animation pivots kept for API parity with tests/swing hooks
       this.leftLeg = new THREE.Group();
@@ -537,7 +571,7 @@
     }
 
     // ==================== START / CONTROL LIFECYCLE ====================
-    startSession({ song, difficulty, charId, autoFever = true, audioOffset = 0, vip = false }) {
+    startSession({ song, difficulty, charId, autoFever = true, audioOffset = 0, vip = false, saberSkin = 'neon_plasma' }) {
       this.initThree();
       this._clearNotes();
 
@@ -547,6 +581,7 @@
       this.song = song;
       this.difficulty = difficulty;
       this.charSpec = CHAR_SPECS[charId] || CHAR_SPECS.luna;
+      this.saberSkinSpec = SABER_SKINS[saberSkin] || SABER_SKINS.neon_plasma;
       this.autoFever = autoFever;
 
       const speedMap = { EASY: 25, NORMAL: 31, HARD: 38, EXTREME: 45 };
@@ -580,14 +615,21 @@
       this.feverRemaining = 0;
       this.counts = { perfect: 0, great: 0, miss: 0 };
 
-      // Bind high-res anime back-view sprite matching selected character (Luna / Kai / Aria)
-      if (this.stickMat) this.stickMat.color.setHex(this.charSpec.stickColor);
-      if (this.stickGlowMat) this.stickGlowMat.color.setHex(this.charSpec.stickColor);
-      this.shieldRing.material.color.setHex(this.charSpec.auraColor);
+      // Bind 5-pose transparent RGBA sprites & equipped saber skin colors
+      const activeStickHex = this.saberSkinSpec ? this.saberSkinSpec.primary : this.charSpec.stickColor;
+      if (this.stickMat) this.stickMat.color.setHex(activeStickHex);
+      if (this.stickGlowMat) this.stickGlowMat.color.setHex(activeStickHex);
+      if (this.slashArcMat) {
+        this.slashArcMat.color.setHex(activeStickHex);
+        this.slashArcMat.opacity = 0;
+      }
+      this.shieldRing.material.color.setHex(this.saberSkinSpec ? this.saberSkinSpec.secondary : this.charSpec.auraColor);
       this.shieldRing.material.opacity = this.shieldLeft > 0 ? 0.55 : 0.0;
-      if (this.runnerHoverMat) this.runnerHoverMat.color.setHex(this.charSpec.auraColor);
-      if (this.runnerSpriteMat && this.runnerBackTextures) {
-        this.runnerSpriteMat.map = this.runnerBackTextures[this.charSpec.id] || this.runnerBackTextures.luna;
+      if (this.runnerHoverMat) this.runnerHoverMat.color.setHex(activeStickHex);
+      this.currentRunnerPose = 'run1';
+      if (this.runnerSpriteMat && this.runnerPoseTextures) {
+        const set = this.runnerPoseTextures[this.charSpec.id] || this.runnerPoseTextures.luna;
+        this.runnerSpriteMat.map = set.run1;
         this.runnerSpriteMat.needsUpdate = true;
       }
 
@@ -683,9 +725,16 @@
       if (this.callbacks.onFeverState) this.callbacks.onFeverState(true);
     }
 
-    _swingSticks(isBigSwipe = false) {
+    _swingSticks(isBigSwipe = false, preferredPose = null) {
       this.swingToggle = 1 - this.swingToggle;
-      this.slashAnimTimer = isBigSwipe ? 0.22 : 0.16;
+      this.slashAnimTimer = 0.16; // Exact 160ms multi-frame slash pose hold
+      if (preferredPose) {
+        this.lastSlashPose = preferredPose;
+      } else if (this.isFever || isBigSwipe) {
+        this.lastSlashPose = this.isFever ? 'slash_x' : (this.swingToggle === 0 ? 'slash_l' : 'slash_r');
+      } else {
+        this.lastSlashPose = (this.swingToggle === 0) ? 'slash_l' : 'slash_r';
+      }
       if (isBigSwipe) {
         this.leftArmPivot.rotation.x = -1.2;
         this.rightArmPivot.rotation.x = -1.2;
@@ -693,6 +742,14 @@
         this.leftArmPivot.rotation.x = -1.05;
       } else {
         this.rightArmPivot.rotation.x = -1.05;
+      }
+      if (this.slashArcMesh && this.slashArcMat) {
+        const skin = this.saberSkinSpec || SABER_SKINS.neon_plasma;
+        const hex = (this.lastSlashPose === 'slash_r') ? skin.secondary : skin.primary;
+        this.slashArcMat.color.setHex(hex);
+        this.slashArcMat.opacity = 0.92;
+        this.slashArcMesh.rotation.z = this.lastSlashPose === 'slash_l' ? 0.65 : (this.lastSlashPose === 'slash_r' ? -0.65 : 0);
+        this.slashArcMesh.scale.setScalar(this.lastSlashPose === 'slash_x' ? 1.38 : 1.05);
       }
     }
 
@@ -828,7 +885,17 @@
         this.fovPunchTimer = 0.12;
       }
       const isMilestone = (this.combo === 10 || this.combo === 25 || this.combo === 50 || this.combo === 100);
-      this._spawnHitBurst(this.visualLaneX, (this.isFever || isMilestone) ? 0xffd84d : this.charSpec.stickColor, isMilestone);
+      const hitPose = (this.isFever || isMilestone || note.isRushBarrage)
+        ? 'slash_x'
+        : (note.type === 'swipeL' ? 'slash_l' : (note.type === 'swipeR' ? 'slash_r' : (this.swingToggle === 0 ? 'slash_l' : 'slash_r')));
+      this._swingSticks(note.type !== 'tap' || hitPose === 'slash_x', hitPose);
+
+      const skin = this.saberSkinSpec || SABER_SKINS.neon_plasma;
+      const burstHex = (this.isFever || isMilestone) ? 0xffd84d : (hitPose === 'slash_r' ? skin.secondary : skin.primary);
+      if (isMilestone) {
+        this.fovPunchTimer = 0.24;
+      }
+      this._spawnHitBurst(this.visualLaneX, burstHex, isMilestone || hitPose === 'slash_x');
 
       if (this.callbacks.onJudgment) {
         this.callbacks.onJudgment({
@@ -953,14 +1020,39 @@
       this.rightLeg.rotation.x = -Math.sin(stridePhase) * 0.65;
 
       if (this.slashAnimTimer > 0) {
-        this.slashAnimTimer -= dt;
+        this.slashAnimTimer = Math.max(0, this.slashAnimTimer - dt);
       }
-      if (this.runnerSprite && this.runnerSpriteMat) {
-        const slashRoll = this.slashAnimTimer > 0 ? ((this.swingToggle === 0 ? 1 : -1) * 0.16) : 0;
-        const runSway = Math.sin(stridePhase) * 0.045;
-        this.runnerSpriteMat.rotation = this.runnerGroup.rotation.z * 0.65 + runSway + slashRoll;
-        const squash = 1 + Math.abs(Math.sin(stridePhase)) * 0.04;
-        this.runnerSprite.scale.set(3.25 / squash, 3.25 * squash, 1);
+      // 5-Pose Multi-Frame State Machine (BPM-synced run1 <-> run2, 160ms slash_l / slash_r / slash_x on hit)
+      if (this.runnerSprite && this.runnerSpriteMat && this.runnerPoseTextures) {
+        const poseSet = this.runnerPoseTextures[this.charSpec.id] || this.runnerPoseTextures.luna;
+        const beatHalf = Math.floor(songTime * (this.song.bpm / 60) * 2) % 2;
+        const desiredPose = this.slashAnimTimer > 0
+          ? (this.lastSlashPose || 'slash_l')
+          : (beatHalf === 0 ? 'run1' : 'run2');
+        if (desiredPose !== this.currentRunnerPose && poseSet[desiredPose]) {
+          this.currentRunnerPose = desiredPose;
+          this.runnerSpriteMat.map = poseSet[desiredPose];
+          this.runnerSpriteMat.needsUpdate = true;
+        }
+        // Subtle bank lean on lane dash only (ZERO artificial PNG slicing or wobbling!)
+        this.runnerSpriteMat.rotation = this.runnerGroup.rotation.z * 0.45;
+        const pulseScale = this.slashAnimTimer > 0 ? 3.52 : 3.35;
+        this.runnerSprite.scale.set(pulseScale, pulseScale, 1);
+      }
+      // Animate 3D Crescent Slash Arc VFX (with live rainbow cycling for rainbow_prism skin)
+      if (this.slashArcMesh && this.slashArcMat) {
+        if (this.saberSkinSpec && this.saberSkinSpec.rainbow) {
+          this.slashArcMat.color.setHSL((songTime * 1.4) % 1, 1.0, 0.58);
+          if (this.runnerHoverMat) this.runnerHoverMat.color.setHSL((songTime * 1.4) % 1, 1.0, 0.58);
+        }
+        if (this.slashAnimTimer > 0) {
+          const p = 1 - (this.slashAnimTimer / 0.16);
+          this.slashArcMat.opacity = Math.max(0, (1 - p) * 0.95);
+          this.slashArcMesh.rotation.z += dt * (this.lastSlashPose === 'slash_l' ? -14 : 14);
+          this.slashArcMesh.scale.setScalar(1.0 + p * 0.55);
+        } else {
+          this.slashArcMat.opacity = 0;
+        }
       }
 
       // Subtle dynamic camera follow + micro hit-shake + PERFECT FOV zoom punch (60 -> 57.2 -> 60)
@@ -1113,6 +1205,8 @@
 
       if (this.callbacks.onFrameUpdate) {
         const activeRouteMult = (this.chosenBranch === 'rush' && songTime <= this.chart.branchEnd) ? this.charSpec.rushBranchMult : 1.0;
+        const inRushBarrage = !!(this.chart.rushStart && songTime >= this.chart.rushStart && songTime <= this.chart.rushEnd);
+        const inSlowMoFinish = !!(this.chart.slowMoStart && songTime >= this.chart.slowMoStart);
         this.callbacks.onFrameUpdate({
           songTime,
           duration: this.song.duration,
@@ -1122,7 +1216,9 @@
           showBranchPrompt,
           previewRushSelected,
           rushMult: this.charSpec.rushBranchMult,
-          totalMult: activeRouteMult * (this.isFever ? 2.0 : 1.0)
+          totalMult: activeRouteMult * (this.isFever ? 2.0 : 1.0) * (inRushBarrage ? 1.5 : 1.0),
+          inRushBarrage,
+          inSlowMoFinish
         });
       }
 

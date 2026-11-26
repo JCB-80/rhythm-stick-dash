@@ -6,10 +6,14 @@
   const number = (v, fallback = 0, max = 1e12) => typeof v === 'number' && Number.isFinite(v) ? Math.max(0, Math.min(max, v)) : fallback;
   const PROVIDER_META = {
     kakao: { badge: 'K', label: 'Kakao' }, naver: { badge: 'N', label: 'NAVER' },
-    google: { badge: 'G', label: 'Google' }, apple: { badge: 'A', label: 'Apple' }, guest: { badge: 'P', label: 'Guest' }
+    google: { badge: 'G', label: 'Google' }, apple: { badge: 'A', label: 'Apple' }
   };
   const CLOUD_CONFIG = { enabled: false, groupId: 'NEO-SYNDICATE-G07' };
-  const OFFICIAL_SONGS = ['galaxy_chase', 'neon_pulse', 'silent_city', 'cyber_overdrive'];
+  const OFFICIAL_SONGS = [
+    'seoul_neon_pulse', 'hyperpop_overdrive', 'gangnam_midnight', 'jersey_club_rush',
+    'cyber_phonk_drift', 'starlight_future_bass', 'retro_synth_highway', 'festival_bigroom_drop',
+    'velocity_dnb', 'velvet_nu_disco', 'hardstyle_inferno', 'vip_trap_anthem'
+  ];
   const DIFFICULTIES = ['EASY', 'NORMAL', 'HARD', 'EXTREME'];
   function hash(text) { let n = 2166136261; for (const ch of text) n = Math.imul(n ^ ch.charCodeAt(0), 16777619); return n >>> 0; }
   // Season boundaries are UTC, identical in every locale.
@@ -24,7 +28,7 @@
     const settings = object(raw.settings) ? raw.settings : {};
     return {
       uid: raw.uid.slice(0, 100), nickname: typeof raw.nickname === 'string' ? raw.nickname.slice(0, 16) : 'Runner',
-      provider: Object.hasOwn(PROVIDER_META, raw.provider) ? raw.provider : 'guest',
+      provider: Object.hasOwn(PROVIDER_META, raw.provider) ? raw.provider : 'google',
       coins: Math.floor(number(raw.coins, 1200)), selectedChar: ['kai', 'luna', 'aria'].includes(raw.selectedChar) ? raw.selectedChar : 'luna',
       // VIP is a free local demo, never a verified purchase entitlement.
       vip: raw.vip === true, loggedOut: !!raw.loggedOut, createdAt: raw.createdAt,
@@ -127,15 +131,15 @@
       ['極速音棍', 'google', 418600],
       ['VelozNeon', 'apple', 385400],
       ['밤하늘심포니', 'naver', 349000],
-      ['BeatHunter77', 'guest', 312500],
+      ['BeatHunter77', 'google', 312500],
       ['GhostRunnerX', 'google', 276800],
       ['초보탈출중', 'kakao', 241300],
       ['MelodySlash', 'apple', 208900],
       ['네오루키', 'naver', 174200],
-      ['StarDrifter', 'guest', 142600],
+      ['StarDrifter', 'apple', 142600],
       ['PixelTempo', 'google', 112400],
       ['비트연습생', 'kakao', 84500],
-      ['RookieStick', 'guest', 52800]
+      ['RookieStick', 'naver', 52800]
     ];
 
     return names.map(([nickname, provider, baseScore], idx) => ({
@@ -158,7 +162,7 @@
     getSongBest(songId, diff) { const v = this.getAllSongScores()[`${songId}__${diff}`]; return v && v.version === 2 ? v : { score: 0, maxCombo: 0, rank: 'D' }; },
     getMyWeeklyTotalScore() { return total(season(current()).scores); },
     getGroupLeaderboard(songId, diff) {
-      const root = current(), user = root.user || { uid: 'guest_local', nickname: 'Runner', provider: 'guest' };
+      const root = current(), user = root.user || { uid: 'social_default', nickname: 'Runner', provider: 'google' };
       const week = season(root), songMode = OFFICIAL_SONGS.includes(songId) && DIFFICULTIES.includes(diff);
       const score = songMode ? (week.scores[`${songId}__${diff}`]?.score || 0) : total(week.scores);
       const rivals = this.getRivals().map(r => ({ ...r, score: songMode ? Math.round(r.score * ({ EASY: .22, NORMAL: .40, HARD: .60, EXTREME: .85 }[diff]) * (.9 + hash(songId + r.uid) % 20 / 100)) : r.score }));

@@ -3,7 +3,7 @@
   const state = {
     currentScene: 'scene-login',
     selectedChar: 'luna',
-    selectedSongId: 'galaxy_chase',
+    selectedSongId: 'seoul_neon_pulse',
     selectedDiff: 'NORMAL',
     game3D: null,
     ghostRivals: [],
@@ -69,15 +69,23 @@
   // Preload core sprites (including sprites_login, sprites_i18n_frames, sprites_transparent, characters)
   function preloadCoreAssets() {
     const urls = [
-      './assets/screens/bg_neo_syndicate_stage.png',
+      './assets/screens/bg_01_neo_seoul.png',
+      './assets/screens/bg_02_cyber_club.png',
+      './assets/screens/bg_03_orbital_highway.png',
+      './assets/screens/bg_04_sunset_tokyo.png',
+      './assets/screens/bg_05_quantum_arena.png',
       './assets/characters/char_kai.png',
       './assets/characters/char_luna.png',
       './assets/characters/char_aria.png',
+      './assets/characters/runner_luna_run1.png',
+      './assets/characters/runner_luna_run2.png',
+      './assets/characters/runner_luna_slash_l.png',
+      './assets/characters/runner_luna_slash_r.png',
+      './assets/characters/runner_luna_slash_x.png',
       './assets/sprites_login/login_01_kakao.png',
       './assets/sprites_login/login_02_naver.png',
       './assets/sprites_login/login_03_google.png',
       './assets/sprites_login/login_04_apple.png',
-      './assets/sprites_login/login_05_guest.png',
       './assets/sprites_i18n_frames/icon_lang_globe.png',
       './assets/sprites_i18n_frames/btn_frame_primary.png',
       './assets/sprites_i18n_frames/btn_frame_secondary.png',
@@ -86,7 +94,6 @@
       './assets/sprites_i18n_frames/social_bar_naver_blank.png',
       './assets/sprites_i18n_frames/social_bar_google_blank.png',
       './assets/sprites_i18n_frames/social_bar_apple_blank.png',
-      './assets/sprites_i18n_frames/social_bar_guest_blank.png',
       './assets/sprites_transparent/note_tap_orb.png',
       './assets/sprites_transparent/note_swipe_cyan.png',
       './assets/sprites_transparent/note_swipe_magenta.png',
@@ -153,18 +160,17 @@
     container.innerHTML = '';
 
     const isKorean = (window.I18n.current === 'ko');
-    // SPEC 0-B.3: KO -> Kakao, Naver, Google, Apple, Guest | Global -> Google, Apple, Guest (top) + Kakao, Naver (sub)
+    // Social Login ONLY (Guest bypass completely removed)
     const primaryOrder = isKorean
-      ? ['kakao', 'naver', 'google', 'apple', 'guest']
-      : ['google', 'apple', 'guest'];
+      ? ['kakao', 'naver', 'google', 'apple']
+      : ['google', 'apple'];
     const secondaryRegional = isKorean ? [] : ['kakao', 'naver'];
 
     const keyMap = {
       kakao: 'login_kakao',
       naver: 'login_naver',
       google: 'login_google',
-      apple: 'login_apple',
-      guest: 'login_guest'
+      apple: 'login_apple'
     };
 
     const appendBtn = (provider) => {
@@ -256,7 +262,7 @@
   function renderCharacterSelect() {
     const user = window.AuthService.getCurrentUser();
     if (user) {
-      const pMeta = window.AuthService.PROVIDER_META[user.provider] || window.AuthService.PROVIDER_META.guest;
+      const pMeta = window.AuthService.PROVIDER_META[user.provider] || window.AuthService.PROVIDER_META.google;
       $('char-user-badge').textContent = pMeta.badge;
       $('char-user-nick').textContent = user.nickname;
       $('char-user-coins').textContent = (user.coins || 0).toLocaleString();
@@ -333,12 +339,12 @@
       const item = document.createElement('div');
       item.className = `song-item-card ${active ? 'active' : ''}`;
       item.innerHTML = `
-        <div class="song-thumb" style="background: linear-gradient(135deg, ${song.colors[0]}, ${song.colors[1]})">${escapeHtml(song.icon)}</div>
+        <div class="song-thumb" style="background: linear-gradient(135deg, ${song.colors[0]}, ${song.colors[1]})">${escapeHtml(song.badge || song.icon || '01')}</div>
         <div class="song-item-meta">
           <div class="song-item-title">${escapeHtml(song.title)}</div>
           <div class="song-item-sub">
             <span>BPM ${escapeHtml(song.bpm)}</span>
-            <span>⏱ ${escapeHtml(song.lengthText)}</span>
+            <span>${escapeHtml(song.lengthText)}</span>
           </div>
         </div>
       `;
@@ -359,11 +365,16 @@
     $('selected-song-len').textContent = curSong.lengthText;
     $('selected-song-artist').textContent = curSong.isCustom ? window.I18n.t('custom_track_badge') : curSong.artist;
 
+    const stageBg = curSong.bgUrl || './assets/screens/bg_01_neo_seoul.png';
+    const globalBg = $('global-bg');
+    if (globalBg) {
+      globalBg.style.backgroundImage = `url('${stageBg}')`;
+    }
     const coverEl = $('song-cover-visual');
     coverEl.style.backgroundImage = `
-      radial-gradient(circle at 30% 30%, ${curSong.colors[0]}66, transparent 60%),
-      linear-gradient(135deg, ${curSong.colors[0]}44, ${curSong.colors[1]}55),
-      url('./assets/screens/bg_neo_syndicate_stage.png')
+      radial-gradient(circle at 30% 30%, ${curSong.colors[0]}55, transparent 60%),
+      linear-gradient(135deg, ${curSong.colors[0]}33, ${curSong.colors[1]}44),
+      url('${stageBg}')
     `;
 
     // Difficulty Tabs
@@ -424,13 +435,17 @@
         });
       }
 
+      const stageBg = song.bgUrl || './assets/screens/bg_01_neo_seoul.png';
+      if ($('global-bg')) $('global-bg').style.backgroundImage = `url('${stageBg}')`;
+
       state.game3D.startSession({
         song,
         difficulty: state.selectedDiff,
         charId: state.selectedChar,
         autoFever,
         audioOffset: user?.settings.audioOffset || 0,
-        vip: !!user?.vip
+        vip: !!user?.vip,
+        saberSkin: user?.equippedSkin || 'neon_plasma'
       });
       if (!state.game3D._contextEventsBound) {
         state.game3D._contextEventsBound = true;
@@ -833,6 +848,7 @@
       const key = (user && user.vip) ? 'vip_active' : 'shop_vip';
       lbl.setAttribute('data-i18n', key);
       lbl.textContent = window.I18n.t(key);
+      syncCosmeticShopUI();
       $('modal-vip').classList.remove('hidden');
     });
 
@@ -855,14 +871,28 @@
       const u = window.AuthService.getCurrentUser();
       if (!u) return;
       if ($('music-pass-tier-lbl')) $('music-pass-tier-lbl').textContent = `PASS TIER ${u.musicPassTier || 1}/30`;
+      const owned = new Set(['neon_plasma', ...(Array.isArray(u.ownedCosmetics) ? u.ownedCosmetics : [])]);
+      const equipped = u.equippedSkin || 'neon_plasma';
+      document.querySelectorAll('#saber-skins-grid [data-saber]').forEach(btn => {
+        const sid = btn.dataset.saber;
+        const isEq = (sid === equipped);
+        const isOwned = owned.has(sid);
+        btn.style.boxShadow = isEq ? '0 0 14px rgba(0,242,255,0.85)' : 'none';
+        const span = btn.querySelector('span');
+        if (span) {
+          const spec = window.SABER_SKINS && window.SABER_SKINS[sid];
+          span.textContent = isEq ? 'EQUIPPED' : (isOwned ? 'OWNED' : `${spec ? spec.cost : 400} C`);
+        }
+      });
     };
     const buyCosmetic = (id, currency, cost, label) => {
       const u = window.AuthService.getCurrentUser();
       if (!u) return;
       const owned = Array.isArray(u.ownedCosmetics) ? u.ownedCosmetics : [];
-      if (owned.includes(id)) {
+      if (cost === 0 || owned.includes(id)) {
         window.AuthService.updateUser({ equippedSkin: id });
-        showToast(`✅ Equipped ${label}`);
+        syncCosmeticShopUI();
+        showToast(`Equipped ${label}`);
         return;
       }
       if ((u[currency] || 0) < cost) {
@@ -877,11 +907,15 @@
       });
       if (state.currentScene === 'scene-lobby') renderLobby();
       syncCosmeticShopUI();
-      showToast(`✨ Unlocked & Equipped ${label}!`);
+      showToast(`Unlocked & Equipped ${label}!`);
     };
-    if ($('btn-buy-skin-prism')) $('btn-buy-skin-prism').addEventListener('click', () => buyCosmetic('prism_stick', 'coins', 400, 'Prism Stick'));
-    if ($('btn-buy-track-nova')) $('btn-buy-track-nova').addEventListener('click', () => buyCosmetic('nova_track', 'cores', 15, 'Nova Track'));
-    if ($('btn-buy-aura-valk')) $('btn-buy-aura-valk').addEventListener('click', () => buyCosmetic('valk_aura', 'coins', 600, 'Valk Aura'));
+    document.querySelectorAll('#saber-skins-grid [data-saber]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const sid = btn.dataset.saber;
+        const spec = (window.SABER_SKINS && window.SABER_SKINS[sid]) || { cost: 400, name: sid };
+        buyCosmetic(sid, 'coins', spec.cost, spec.name);
+      });
+    });
     if ($('btn-claim-music-pass')) {
       $('btn-claim-music-pass').addEventListener('click', () => {
         const u = window.AuthService.getCurrentUser();

@@ -40,13 +40,14 @@ function runtime(initial = {}, blocked = false, quota = false) {
   for (const file of ['js/storage.js', 'locales/i18n.js', 'js/i18n-ext.js', 'js/auth-ranking.js', 'js/audio-synth.js', 'js/game3d.js']) vm.runInContext(fs.readFileSync(path.join(root, file), 'utf8'), ctx, { filename: file });
   return { ctx, db, intervals, setDate: value => { clock = Date.parse(value); } };
 }
-const result = (id = 'run-1', extra = {}) => ({ songId: 'galaxy_chase', diff: 'NORMAL', score: 250000, maxCombo: 90, rankGrade: 'A', sessionId: id, cleared: true, accuracy: .9, ...extra });
+const result = (id = 'run-1', extra = {}) => ({ songId: 'seoul_neon_pulse', diff: 'NORMAL', score: 250000, maxCombo: 90, rankGrade: 'A', sessionId: id, cleared: true, accuracy: .9, ...extra });
 
 test('blocked localStorage still allows language changes, login and session updates', async () => {
   const { ctx: c } = runtime({}, true);
   c.I18n.setLang('es'); assert.equal(c.I18n.current, 'es');
-  await c.AuthService.signIn('guest'); c.AuthService.updateUser({ coins: 55 });
+  await c.AuthService.signIn('google'); c.AuthService.updateUser({ coins: 55 });
   assert.equal(c.AuthService.getCurrentUser().coins, 55); assert.equal(c.GameStorage.persistent, false);
+  assert.equal('guest' in c.AuthService.PROVIDER_META, false, 'Guest provider must be removed');
 });
 for (const corrupt of ['null', '[]', '{broken', '{"a":null}', '{"galaxy_chase__NORMAL":{"score":"99"}}']) {
   test(`corrupt score migration is safe: ${corrupt}`, () => {
@@ -78,7 +79,7 @@ test('weekly scores reset, personal best persists, promotion settles once and re
   setDate('2026-11-30T00:00:00Z');
   assert.equal(c.RankingEngine.getMyWeeklyTotalScore(), 0); assert.equal(c.AuthService.getCurrentUser().league, 1);
   assert.equal(c.AuthService.getCurrentUser().league, 1);
-  assert.equal(c.RankingEngine.getSongBest('galaxy_chase', 'NORMAL').score, 2000000);
+  assert.equal(c.RankingEngine.getSongBest('seoul_neon_pulse', 'NORMAL').score, 2000000);
   const claim = c.RankingEngine.claimWeeklyReward(); assert.equal(claim.coinsAdded, 500);
   assert.equal(c.RankingEngine.claimWeeklyReward().ok, false);
 });
@@ -99,10 +100,12 @@ test('demo bonus is once per UTC day and VIP stays explicitly local', async () =
 test('same-week AI ranks are stable and per-track leaderboards contain 30 entries', () => {
   const { ctx: c } = runtime();
   assert.equal(JSON.stringify(c.RankingEngine.getRivals()), JSON.stringify(c.RankingEngine.getRivals()));
-  assert.equal(c.RankingEngine.getGroupLeaderboard('galaxy_chase', 'HARD').length, 30);
+  assert.equal(c.RankingEngine.getGroupLeaderboard('seoul_neon_pulse', 'HARD').length, 30);
 });
-test('all 16 builtin charts have sorted unique IDs and valid note times; short audio has no fork', () => {
+test('all 48 builtin charts (12 songs x 4 diffs) have sorted unique IDs, rush barrage, and valid note times', () => {
   const { ctx: c } = runtime();
+  assert.equal(c.SONGS.length, 12);
+  assert.equal(Object.keys(c.SABER_SKINS).length, 6);
   for (const song of c.SONGS) for (const diff of ['EASY', 'NORMAL', 'HARD', 'EXTREME']) {
     const chart = c.AudioEngine.generateChart(song, diff);
     chart.notes.forEach((n, i) => { assert.equal(n.id, i); assert.ok(n.time >= 0 && n.time < song.duration); assert.ok(!i || chart.notes[i - 1].time <= n.time); });
@@ -165,22 +168,13 @@ test('fever expiration uses the song clock even at low FPS and fork selection la
   time = 33.3; g._animate(1200); assert.equal(g.chosenBranch, 'none');
 });
 test('pause stops scheduled BGM voices; resume clock does not rewind; stop releases all BGM voices', () => {
-  const { ctx: c, intervals } = runtime(), a = c.AudioEngine; a.startSong(c.SONGS[0]);
+  const { ctx: c } = runtime(), a = c.AudioEngine;
+  const mockSong = { ...c.SONGS[0], audioBuffer: { duration: 80 } };
+  a.startSong(mockSong);
   assert.ok([...a.voices].some(v => v.bus === a.bgmGain)); a.ctx.currentTime = 5;
   const before = a.getSongTime(); a.pauseSong(); assert.equal(a.voices.size, 0);
   a.ctx.currentTime = 50; assert.equal(a.getSongTime(), before); a.resumeSong(); assert.equal(a.getSongTime(), before);
-  a.stopSong(); assert.equal(a.voices.size, 0); assert.equal(intervals.size, 0);
-});
-test('scheduler skips timer backlogs instead of replaying all expired synth steps', () => {
-  const { ctx: c, intervals } = runtime(), a = c.AudioEngine; let scheduled = [];
-  a._scheduleSynthStep = (_, step, time) => scheduled.push({ step, time });
-  a.startSong(c.SONGS[0]); scheduled = []; a.ctx.currentTime = 30;
-  [...intervals.values()][0](); assert.ok(scheduled.length < 4); assert.ok(scheduled.every(s => s.time >= 29.985)); a.stopSong();
-});
-test('off-beat hihats are scheduled before climax', () => {
-  const { ctx: c } = runtime(), a = c.AudioEngine; let hats = 0;
-  a.triggerKick = a.triggerSnare = a.triggerBass = a.triggerLead = () => {};
-  a.triggerHiHat = () => hats++; a._scheduleSynthStep(c.SONGS[0], 2, 0, .1); assert.equal(hats, 1);
+  a.stopSong(); assert.equal(a.voices.size, 0);
 });
 test('custom upload uses stable file IDs, enforces size/duration and propagates decode rejection', async () => {
   const { ctx: c } = runtime(), a = c.AudioEngine;
@@ -197,10 +191,14 @@ test('new translation keys are present in all five locales', () => {
   for (const lang of c.I18n.supported) assert.deepEqual(Object.keys(c.GAME_LOCALES[lang]).sort(), keys.slice().sort());
 });
 
-test('all builtin beatmaps match the original gameplay baseline', () => {
+test('all 12 builtin tracks reference real .ogg audio and 5 distinct stage maps', () => {
   const { ctx: c } = runtime();
-  const charts = c.SONGS.flatMap(song => ['EASY', 'NORMAL', 'HARD', 'EXTREME'].map(diff => c.AudioEngine.generateChart(song, diff)));
-  assert.equal(createHash('sha256').update(JSON.stringify(charts)).digest('hex'), '9cb87fe9f57ea81d3604ac208672da2cc807ffe4d44ea0c4f269fb6ea5218aac');
+  const bgs = new Set(c.SONGS.map(s => s.bgUrl));
+  assert.equal(bgs.size, 5);
+  for (const s of c.SONGS) {
+    assert.ok(fs.existsSync(path.join(root, s.audioUrl)), `Missing audio: ${s.audioUrl}`);
+    assert.ok(fs.existsSync(path.join(root, s.bgUrl)), `Missing bg: ${s.bgUrl}`);
+  }
 });
 
 test('custom MP3 resume aligns 40ms buffer anchor without drift or rewind', () => {

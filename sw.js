@@ -1,6 +1,6 @@
 // Offline-capable Service Worker for PWA & TWA Store packaging
 const CACHE_PREFIX = `rhythm-stick-dash:${self.registration.scope}:`;
-const CACHE_NAME = CACHE_PREFIX + 'v8';
+const CACHE_NAME = CACHE_PREFIX + 'v10';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -12,11 +12,16 @@ const CORE_ASSETS = [
   './locales/i18n.js',
   './js/i18n-ext.js',
   './js/auth-ranking.js',
+  './js/liveops.js',
   './js/audio-synth.js',
   './js/runner-sprite.js',
   './js/game3d.js',
   './js/app.js',
-  './assets/screens/bg_neo_syndicate_stage.png',
+  './assets/screens/bg_01_neo_seoul.png',
+  './assets/screens/bg_02_cyber_club.png',
+  './assets/screens/bg_03_orbital_highway.png',
+  './assets/screens/bg_04_sunset_tokyo.png',
+  './assets/screens/bg_05_quantum_arena.png',
   './assets/characters/char_kai.png',
   './assets/characters/char_luna.png',
   './assets/characters/char_aria.png',
@@ -28,7 +33,6 @@ const CORE_ASSETS = [
   './assets/sprites_i18n_frames/social_bar_naver_blank.png',
   './assets/sprites_i18n_frames/social_bar_google_blank.png',
   './assets/sprites_i18n_frames/social_bar_apple_blank.png',
-  './assets/sprites_i18n_frames/social_bar_guest_blank.png',
   './assets/sprites_transparent/note_tap_orb.png',
   './assets/sprites_transparent/note_swipe_cyan.png',
   './assets/sprites_transparent/note_swipe_magenta.png',
@@ -68,7 +72,16 @@ self.addEventListener('activate', event => {
 
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET' || !event.request.url.startsWith(self.registration.scope)) return;
+  // Network-first so code & asset updates take effect immediately while staying offline-capable
   event.respondWith(
-    caches.open(CACHE_NAME).then(cache => cache.match(event.request)).then(cached => cached || fetch(event.request))
+    fetch(event.request)
+      .then(res => {
+        if (res && res.ok) {
+          const clone = res.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone)).catch(() => {});
+        }
+        return res;
+      })
+      .catch(() => caches.open(CACHE_NAME).then(cache => cache.match(event.request)))
   );
 });

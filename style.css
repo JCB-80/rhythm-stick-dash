@@ -1014,10 +1014,10 @@ html, body {
   position: relative;
   z-index: 6;
   display: grid;
-  grid-template-columns: 1fr minmax(260px, 440px) 1fr;
+  grid-template-columns: 1fr minmax(220px, 420px) 1fr;
   align-items: start;
-  gap: 12px;
-  padding: 14px 165px 0 18px;
+  gap: 10px;
+  padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) 0 max(12px, env(safe-area-inset-left));
   pointer-events: none;
 }
 
@@ -1149,31 +1149,39 @@ html, body {
 .hud-right-cluster {
   display: flex;
   justify-content: flex-end;
+  padding-right: max(0px, env(safe-area-inset-right));
+  min-width: 0;
 }
 
 .hud-score-box {
   text-align: right;
-  background: rgba(10, 8, 32, 0.75);
-  border: 1px solid rgba(0, 242, 255, 0.35);
-  padding: 6px 14px;
+  background: rgba(10, 8, 32, 0.78);
+  border: 1px solid rgba(0, 242, 255, 0.42);
+  padding: 6px 12px;
   border-radius: 12px;
+  max-width: 170px;
+  overflow: hidden;
 }
 
 .hud-score-box small {
   display: block;
   font-size: 11px;
   color: #a9d6ff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .hud-score-box strong {
-  font-size: clamp(20px, 2.2vw, 30px);
+  font-size: clamp(18px, 2.1vw, 28px);
   color: var(--gold);
   font-weight: 900;
 }
 
 .song-progress-mini {
   margin-top: 4px;
-  width: 130px;
+  width: 100%;
+  min-width: 96px;
   height: 4px;
   background: rgba(255, 255, 255, 0.15);
   border-radius: 4px;
@@ -1875,14 +1883,14 @@ button:disabled { opacity: .5; cursor: default; }
   .difficulty-tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); width: 100%; border-radius: 12px; gap: 2px; }
   .diff-pill { padding: 7px 3px; }
   .start-run-neon-btn { width: 100%; justify-content: center; }
-  .ingame-top-hud { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; padding: max(10px, env(safe-area-inset-top)) 10px 0; }
+  .ingame-top-hud { grid-template-columns: minmax(0, 1fr) auto; gap: 8px; padding: max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) 0 max(10px, env(safe-area-inset-left)); }
   .hud-left-cluster { gap: 6px; flex-wrap: wrap; }
   .hud-diff-badge { padding: 4px 6px; font-size: 11px; }
   .hud-combo-box strong { font-size: 24px; }
   .hud-center-cluster { grid-column: 1 / -1; grid-row: 2; }
   .hud-right-cluster { grid-column: 2; grid-row: 1; min-width: 0; }
-  .hud-score-box { max-width: 100%; padding: 6px 8px; }
-  #hud-song-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 130px; }
+  .hud-score-box { max-width: 132px; padding: 5px 8px; }
+  #hud-song-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 114px; }
   .song-progress-mini { width: 100%; }
   .fever-gauge-shell, .hp-bar-shell { width: 100%; }
   .branch-choice-overlay { top: 30%; gap: 6px; align-items: stretch; }
@@ -1891,6 +1899,7 @@ button:disabled { opacity: .5; cursor: default; }
   .branch-center-prompt { position: absolute; top: -42px; left: 0; right: 0; padding: 6px; text-align: center; border-radius: 8px; font-size: 10px; }
   .ingame-bottom-controls { left: 10px; right: 10px; }
   .sprite-ctrl-btn { width: 58px; height: 64px; }
+  .sprite-ctrl-btn kbd { display: none; }
   .lane-btn-pair, .action-btn-pair { gap: 6px; }
   .result-top-banner { padding-right: 0; gap: 8px; }
   .result-title-glow { font-size: 24px; letter-spacing: 0; }
@@ -1915,6 +1924,7 @@ button:disabled { opacity: .5; cursor: default; }
   .hud-ghost-stack { display: none; }
   .branch-choice-overlay { top: 34%; }
   .sprite-ctrl-btn { width: 54px; height: 54px; }
+  .sprite-ctrl-btn kbd { display: none; }
   .modal-panel { overflow-y: auto; max-height: 92dvh; }
 }
 @media (prefers-reduced-motion: reduce) {

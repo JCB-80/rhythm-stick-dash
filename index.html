@@ -192,9 +192,9 @@
             </div>
 
             <div id="w2-modifiers-bar" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px;">
-              <button type="button" data-mod="MIRROR" style="padding:6px 4px;border-radius:8px;border:1px solid rgba(0,242,254,0.4);background:rgba(8,20,38,0.85);color:#bae6fd;font-size:11px;font-weight:800;cursor:pointer;">🪞 MIRROR +15%</button>
-              <button type="button" data-mod="HIDDEN" style="padding:6px 4px;border-radius:8px;border:1px solid rgba(192,132,252,0.4);background:rgba(30,10,48,0.85);color:#f3e8ff;font-size:11px;font-weight:800;cursor:pointer;">👻 HIDDEN +20%</button>
-              <button type="button" data-mod="SPEED_125" style="padding:6px 4px;border-radius:8px;border:1px solid rgba(251,191,36,0.4);background:rgba(48,25,8,0.85);color:#fef3c7;font-size:11px;font-weight:800;cursor:pointer;">⚡ 1.25x +25%</button>
+              <button type="button" data-mod="MIRROR" style="padding:6px 4px;border-radius:8px;border:1px solid rgba(0,242,254,0.4);background:rgba(8,20,38,0.85);color:#bae6fd;font-size:11px;font-weight:800;cursor:pointer;">MIRROR +15%</button>
+              <button type="button" data-mod="HIDDEN" style="padding:6px 4px;border-radius:8px;border:1px solid rgba(192,132,252,0.4);background:rgba(30,10,48,0.85);color:#f3e8ff;font-size:11px;font-weight:800;cursor:pointer;">HIDDEN +20%</button>
+              <button type="button" data-mod="SPEED_125" style="padding:6px 4px;border-radius:8px;border:1px solid rgba(251,191,36,0.4);background:rgba(48,25,8,0.85);color:#fef3c7;font-size:11px;font-weight:800;cursor:pointer;">1.25x +25%</button>
             </div>
             <button id="btn-start-run" type="button" class="start-run-neon-btn">
               <span class="start-brackets">»</span>
@@ -429,19 +429,22 @@
       </div>
       <div id="cosmetic-sink-panel" style="margin-top:12px;padding:10px;border-radius:12px;background:rgba(0,242,254,0.08);border:1px solid rgba(0,242,254,0.35);">
         <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:800;color:#67e8f9;margin-bottom:8px;">
-          <span>🎨 RUNNER SKIN · STICK VFX · TRACK SHOP</span>
+          <span>LIGHTSABER SKINS (6) · TRACK SHOP</span>
           <span id="music-pass-tier-lbl" style="color:#fde047;">PASS TIER 1/30</span>
         </div>
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px;">
-          <button id="btn-buy-skin-prism" type="button" style="padding:7px 4px;border-radius:8px;border:1px solid #22d3ee;background:rgba(8,51,68,0.85);color:#ecfeff;font-size:11px;font-weight:700;cursor:pointer;">⚡ Prism Stick<br><span style="color:#fde047;">400 🪙</span></button>
-          <button id="btn-buy-track-nova" type="button" style="padding:7px 4px;border-radius:8px;border:1px solid #f472b6;background:rgba(80,7,36,0.85);color:#fdf2f8;font-size:11px;font-weight:700;cursor:pointer;">🌌 Nova Track<br><span style="color:#38bdf8;">15 ⚡CORE</span></button>
-          <button id="btn-buy-aura-valk" type="button" style="padding:7px 4px;border-radius:8px;border:1px solid #facc15;background:rgba(66,32,6,0.85);color:#fefce8;font-size:11px;font-weight:700;cursor:pointer;">👑 Valk Aura<br><span style="color:#fde047;">600 🪙</span></button>
+        <div id="saber-skins-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px;">
+          <button type="button" data-saber="neon_plasma" style="padding:7px 4px;border-radius:8px;border:1.5px solid #00f2ff;background:rgba(8,40,68,0.88);color:#ecfeff;font-size:10.5px;font-weight:800;cursor:pointer;">네온 플라즈마<br><span style="color:#67e8f9;">FREE</span></button>
+          <button type="button" data-saber="gold_dragon" style="padding:7px 4px;border-radius:8px;border:1.5px solid #ffd84d;background:rgba(66,38,6,0.88);color:#fefce8;font-size:10.5px;font-weight:800;cursor:pointer;">골드 드래곤<br><span style="color:#fde047;">400 C</span></button>
+          <button type="button" data-saber="rainbow_prism" style="padding:7px 4px;border-radius:8px;border:1.5px solid #f472b6;background:linear-gradient(135deg,rgba(8,51,68,0.9),rgba(80,7,36,0.9));color:#fdf2f8;font-size:10.5px;font-weight:800;cursor:pointer;">레인보우 프리즘<br><span style="color:#fde047;">600 C</span></button>
+          <button type="button" data-saber="cyber_katana" style="padding:7px 4px;border-radius:8px;border:1.5px solid #38bdf8;background:rgba(12,32,58,0.88);color:#e0f2fe;font-size:10.5px;font-weight:800;cursor:pointer;">사이버 카타나<br><span style="color:#fde047;">800 C</span></button>
+          <button type="button" data-saber="blood_ruby" style="padding:7px 4px;border-radius:8px;border:1.5px solid #ff1e42;background:rgba(68,8,20,0.88);color:#ffe4e6;font-size:10.5px;font-weight:800;cursor:pointer;">블러드 루비<br><span style="color:#fde047;">1000 C</span></button>
+          <button type="button" data-saber="ice_crystal" style="padding:7px 4px;border-radius:8px;border:1.5px solid #bae6fd;background:rgba(14,48,74,0.88);color:#f0f9ff;font-size:10.5px;font-weight:800;cursor:pointer;">아이스 크리스탈<br><span style="color:#fde047;">1200 C</span></button>
         </div>
-        <button id="btn-claim-music-pass" type="button" style="width:100%;padding:8px;border-radius:8px;border:1px solid #f59e0b;background:linear-gradient(135deg,#d97706,#f59e0b);color:#111;font-weight:800;font-size:12px;cursor:pointer;">🎵 Season Music Pass Tier Claim (+250 🪙 / +5 ⚡CORE)</button>
+        <button id="btn-claim-music-pass" type="button" style="width:100%;padding:8px;border-radius:8px;border:1px solid #f59e0b;background:linear-gradient(135deg,#d97706,#f59e0b);color:#111;font-weight:800;font-size:12px;cursor:pointer;">Season Music Pass Tier Claim (+250 C / +5 CORE)</button>
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-top:7px;">
-          <button id="btn-rsd-checkin" type="button" style="padding:6px 4px;border-radius:7px;border:1px solid #fbbf24;background:rgba(120,53,15,0.7);color:#fef3c7;font-size:10.5px;font-weight:800;cursor:pointer;">📅 7일 출석</button>
-          <button id="btn-rsd-missions" type="button" style="padding:6px 4px;border-radius:7px;border:1px solid #34d399;background:rgba(6,78,59,0.7);color:#d1fae5;font-size:10.5px;font-weight:800;cursor:pointer;">📋 일일미션(5)</button>
-          <button id="btn-rsd-starter2x" type="button" style="padding:6px 4px;border-radius:7px;border:1px solid #fb7185;background:rgba(136,19,55,0.7);color:#ffe4e6;font-size:10.5px;font-weight:800;cursor:pointer;">⚡ ₩1,200 2배</button>
+          <button id="btn-rsd-checkin" type="button" style="padding:6px 4px;border-radius:7px;border:1px solid #fbbf24;background:rgba(120,53,15,0.7);color:#fef3c7;font-size:10.5px;font-weight:800;cursor:pointer;">7일 출석</button>
+          <button id="btn-rsd-missions" type="button" style="padding:6px 4px;border-radius:7px;border:1px solid #34d399;background:rgba(6,78,59,0.7);color:#d1fae5;font-size:10.5px;font-weight:800;cursor:pointer;">일일미션(5)</button>
+          <button id="btn-rsd-starter2x" type="button" style="padding:6px 4px;border-radius:7px;border:1px solid #fb7185;background:rgba(136,19,55,0.7);color:#ffe4e6;font-size:10.5px;font-weight:800;cursor:pointer;">₩1,200 2배</button>
         </div>
       </div>
     </div>
