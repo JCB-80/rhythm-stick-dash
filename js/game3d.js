@@ -485,8 +485,8 @@
         return t;
       };
       this.lunaSheets = {
-        run:   loadSheetTex('./assets/characters/runner_luna_run_sheet.png'),
-        slash: loadSheetTex('./assets/characters/runner_luna_slash_sheet.png')
+        run:   loadSheetTex('./assets/characters/runner_luna_run_sheet.png?v=2'),
+        slash: loadSheetTex('./assets/characters/runner_luna_slash_sheet.png?v=2')
       };
       this.currentRunnerPose = 'run1';
       this.lastSlashPose = 'slash_l';
@@ -701,8 +701,12 @@
       if (this.runnerHoverMat) this.runnerHoverMat.color.setHex(activeStickHex);
       this.currentRunnerPose = 'run1';
       if (this.runnerSpriteMat && this.runnerPoseTextures) {
-        const set = this.runnerPoseTextures[this.charSpec.id] || this.runnerPoseTextures.luna;
-        this.runnerSpriteMat.map = set.run1;
+        if (this.charSpec.id === 'luna' && this.lunaSheets && this.lunaSheets.run) {
+          this.runnerSpriteMat.map = this.lunaSheets.run;
+        } else {
+          const set = this.runnerPoseTextures[this.charSpec.id] || this.runnerPoseTextures.luna;
+          this.runnerSpriteMat.map = set.run1;
+        }
         this.runnerSpriteMat.needsUpdate = true;
       }
 
@@ -1091,8 +1095,7 @@
       this.runnerGroup.rotation.z *= Math.pow(0.08, dt);
 
       const stridePhase = songTime * (this.song.bpm / 60) * Math.PI * 2;
-      const strideHop = Math.abs(Math.sin(stridePhase));
-      this.runnerGroup.position.y = 0.05 + strideHop * 0.13;
+      this.runnerGroup.position.y = 0.05;
       this.leftLeg.rotation.x = Math.sin(stridePhase) * 0.65;
       this.rightLeg.rotation.x = -Math.sin(stridePhase) * 0.65;
 
@@ -1109,13 +1112,13 @@
       // 8-Frame (4x2) Smooth Sprite-Sheet State Machine for Luna + 5-Pose Fallback for Kai/Aria
       if (this.runnerSprite && this.runnerSpriteMat && this.runnerPoseTextures) {
         const poseSet = this.runnerPoseTextures[this.charSpec.id] || this.runnerPoseTextures.luna;
-        const useLunaSheet = this.charSpec.id === 'luna' && this.lunaSheets && this.lunaSheets.run && this.lunaSheets.run.image;
+        const useLunaSheet = this.charSpec.id === 'luna' && this.lunaSheets && this.lunaSheets.run;
         if (useLunaSheet) {
           const isSlashing = this.slashAnimTimer > 0;
           const sheetTex = isSlashing ? this.lunaSheets.slash : this.lunaSheets.run;
           const frameIdx = isSlashing
             ? Math.min(7, Math.floor(slashProg * 8))
-            : Math.floor(songTime * (this.song.bpm / 60) * 4) % 8;
+            : Math.floor(songTime * (this.song.bpm / 60) * 6) % 8;
           const col = frameIdx % 4;
           const row = Math.floor(frameIdx / 4);
           sheetTex.repeat.set(0.25, 0.5);
@@ -1136,16 +1139,13 @@
             this.runnerSpriteMat.needsUpdate = true;
           }
         }
-        const strideSquash = Math.cos(stridePhase * 2) * 0.055;
-        const baseScale = 3.35 + slashPunch * 0.24;
-        const sx = baseScale * (1 + strideSquash + recoilRatio * 0.09);
-        const sy = baseScale * (1 - strideSquash - recoilRatio * 0.08);
+        // Clean steady head & torso during sprint (ZERO artificial head wobble); crisp lunge only on slash/miss
+        const baseScale = 3.35 + slashPunch * 0.18;
+        const sx = baseScale * (1 + recoilRatio * 0.08);
+        const sy = baseScale * (1 - recoilRatio * 0.06);
         this.runnerSprite.scale.set(sx, sy, 1);
-        this.runnerSprite.position.z = -slashPunch * 0.42 + recoilRatio * 0.34;
-        const slashTilt = this.slashAnimTimer > 0
-          ? (this.lastSlashPose === 'slash_l' ? 0.12 : (this.lastSlashPose === 'slash_r' ? -0.12 : 0)) * slashPunch
-          : Math.sin(stridePhase) * 0.032;
-        this.runnerSpriteMat.rotation = this.runnerGroup.rotation.z * 0.5 + slashTilt + recoilRatio * 0.16;
+        this.runnerSprite.position.z = -slashPunch * 0.36 + recoilRatio * 0.28;
+        this.runnerSpriteMat.rotation = this.runnerGroup.rotation.z * 0.28;
         if (recoilRatio > 0) {
           this.runnerSpriteMat.color.setHex(0xff7a90);
         } else if (this.isFever) {

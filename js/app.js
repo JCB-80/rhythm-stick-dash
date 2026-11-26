@@ -80,6 +80,8 @@
       './assets/characters/char_aria.png',
       './assets/characters/runner_luna_run1.png',
       './assets/characters/runner_luna_run2.png',
+      './assets/characters/runner_luna_run_sheet.png?v=2',
+      './assets/characters/runner_luna_slash_sheet.png?v=2',
       './assets/characters/runner_luna_slash_l.png',
       './assets/characters/runner_luna_slash_r.png',
       './assets/characters/runner_luna_slash_x.png',
