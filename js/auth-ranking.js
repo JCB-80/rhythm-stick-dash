@@ -90,17 +90,19 @@
   }
   function current() { const root = readRoot(); season(root); save(root); return root; }
   const LocalAuthAdapter = {
-    async signIn(provider) {
+    async signIn(provider, customNickname = '') {
       await new Promise(resolve => setTimeout(resolve, 400));
       const root = readRoot();
-      root.user = cleanUser({ uid: `uid_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`, nickname: `Runner_${Math.floor(100 + Math.random() * 900)}`, coins: 1200, ...(root.user || {}), provider, loggedOut: false });
+      const trimmed = typeof customNickname === 'string' ? customNickname.trim().slice(0, 16) : '';
+      const defaultNick = (root.user && root.user.nickname) || `Runner_${Math.floor(100 + Math.random() * 900)}`;
+      root.user = cleanUser({ uid: `uid_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`, coins: 1200, ...(root.user || {}), nickname: trimmed || defaultNick, provider, loggedOut: false });
       season(root); save(root); return root.user;
     }
   };
   const CloudAuthAdapter = { async signIn() { throw new Error('Cloud authentication is not configured'); } };
   window.AuthService = {
     PROVIDER_META,
-    signIn(provider) { return (CLOUD_CONFIG.enabled ? CloudAuthAdapter : LocalAuthAdapter).signIn(provider); },
+    signIn(provider, customNickname = '') { return (CLOUD_CONFIG.enabled ? CloudAuthAdapter : LocalAuthAdapter).signIn(provider, customNickname); },
     getCurrentUser() { return current().user; },
     updateUser(patch) {
       const root = current(); if (!root.user) return null;

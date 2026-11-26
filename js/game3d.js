@@ -162,12 +162,38 @@
       this.audioOffset = 0; this.nextMissIndex = 0; this.visibleStartIndex = 0;
       this.swingToggle = 0;
       this.slashAnimTimer = 0;
+      this.missRecoilTimer = 0;
+      this.runnerAfterimages = [];
+      this.afterimageTrail = [];
+      this.noteSpeedMult = 1.0;
 
       this.counts = { perfect: 0, great: 0, miss: 0 };
-      this.approachSpeed = 30;    // units per second
+      this.approachSpeed = 31;    // units per second (dynamically computed per song BPM & difficulty)
 
       this._onResize = this._onResize.bind(this);
       this._animate = this._animate.bind(this);
+    }
+
+    static computeNoteSpeed(song, difficulty, userMult = 1.0, speed125Mod = false) {
+      const baseMap = { EASY: 24, NORMAL: 31, HARD: 39, EXTREME: 47 };
+      const styleMap = {
+        dnb: 1.04,
+        hardstyle: 1.03,
+        hyperpop: 1.02,
+        phonk: 1.01,
+        disco: 0.96,
+        synthwave: 0.97,
+        bounce: 0.98
+      };
+      const base = baseMap[difficulty] || 31;
+      const bpm = Number(song && song.bpm) || 135;
+      const bpmFactor = Math.max(0.88, Math.min(1.24, Math.pow(bpm / 135, 0.72)));
+      const styleFactor = (song && styleMap[song.style]) || 1.0;
+      const safeUserMult = Math.max(0.75, Math.min(1.6, Number(userMult) || 1.0));
+      const modMult = speed125Mod ? 1.25 : 1.0;
+      const approachSpeed = Number((base * bpmFactor * styleFactor * safeUserMult * modMult).toFixed(2));
+      const reactionSec = Number((82 / approachSpeed).toFixed(2));
+      return { approachSpeed, reactionSec, bpmFactor, styleFactor };
     }
 
     initThree() {
@@ -467,8 +493,28 @@
       this.runnerSprite.renderOrder = 8;
       this.runnerGroup.add(this.runnerSprite);
 
-      // 3D Neon Crescent Slash Arc VFX Mesh (colored by equipped Saber Skin!)
-      const arcGeo = new THREE.RingGeometry(1.15, 1.95, 28, 1, -Math.PI * 0.42, Math.PI * 0.84);
+      // 2 Neon Afterimage Ghost Sprites for dash / slash / fever motion trails
+      this.runnerAfterimages = [];
+      this.afterimageTrail = [];
+      for (let g = 0; g < 2; g++) {
+        const gMat = new THREE.SpriteMaterial({
+          map: this.runnerPoseTextures.luna.run1,
+          color: 0x00f2ff,
+          transparent: true,
+          opacity: 0,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false
+        });
+        const gSprite = new THREE.Sprite(gMat);
+        gSprite.scale.set(3.25 - g * 0.14, 3.25 - g * 0.14, 1);
+        gSprite.position.set(0, 1.62, 0.65 + (g + 1) * 0.45);
+        gSprite.renderOrder = 6 - g;
+        this.scene.add(gSprite);
+        this.runnerAfterimages.push({ sprite: gSprite, mat: gMat });
+      }
+
+      // Dual-Layer 3D Neon Crescent Slash Arc VFX (Outer Colored Glow + Inner White-Hot Core)
+      const arcGeo = new THREE.RingGeometry(1.12, 1.98, 28, 1, -Math.PI * 0.44, Math.PI * 0.88);
       this.slashArcMat = new THREE.MeshBasicMaterial({
         color: 0x00f2ff,
         transparent: true,
@@ -480,6 +526,19 @@
       this.slashArcMesh = new THREE.Mesh(arcGeo, this.slashArcMat);
       this.slashArcMesh.position.set(0, 1.35, -0.55);
       this.slashArcMesh.renderOrder = 9;
+      const coreArcGeo = new THREE.RingGeometry(1.38, 1.64, 24, 1, -Math.PI * 0.36, Math.PI * 0.72);
+      this.slashCoreMat = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0,
+        side: THREE.DoubleSide,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+      });
+      this.slashCoreMesh = new THREE.Mesh(coreArcGeo, this.slashCoreMat);
+      this.slashCoreMesh.position.z = -0.02;
+      this.slashCoreMesh.renderOrder = 10;
+      this.slashArcMesh.add(this.slashCoreMesh);
       this.runnerGroup.add(this.slashArcMesh);
 
       // Dummy animation pivots kept for API parity with tests/swing hooks
@@ -571,7 +630,7 @@
     }
 
     // ==================== START / CONTROL LIFECYCLE ====================
-    startSession({ song, difficulty, charId, autoFever = true, audioOffset = 0, vip = false, saberSkin = 'neon_plasma' }) {
+    startSession({ song, difficulty, charId, autoFever = true, audioOffset = 0, vip = false, saberSkin = 'neon_plasma', noteSpeedMult = 1.0 }) {
       this.initThree();
       this._clearNotes();
 
@@ -583,10 +642,13 @@
       this.charSpec = CHAR_SPECS[charId] || CHAR_SPECS.luna;
       this.saberSkinSpec = SABER_SKINS[saberSkin] || SABER_SKINS.neon_plasma;
       this.autoFever = autoFever;
+      this.noteSpeedMult = Math.max(0.75, Math.min(1.6, Number(noteSpeedMult) || 1.0));
+      this.missRecoilTimer = 0;
+      this.afterimageTrail = [];
 
-      const speedMap = { EASY: 25, NORMAL: 31, HARD: 38, EXTREME: 45 };
       const mods = (window.Wave2LiveOps && window.Wave2LiveOps.state.activeModifiers) || {};
-      this.approachSpeed = (speedMap[difficulty] || 31) * (mods.SPEED_125 ? 1.25 : 1.0);
+      const speedProfile = RhythmGame3D.computeNoteSpeed(song, difficulty, this.noteSpeedMult, !!mods.SPEED_125);
+      this.approachSpeed = speedProfile.approachSpeed;
       this.hiddenMode = !!mods.HIDDEN;
 
       this.chart = window.AudioEngine.generateChart(song, difficulty);
@@ -832,6 +894,7 @@
           this.counts.miss++;
           this.combo = 0;
           this.hp = Math.max(0, this.hp - 10);
+          this.missRecoilTimer = 0.22;
           window.AudioEngine.playMissSfx();
           if (window.Haptics) window.Haptics.trigger('miss');
           if (this.callbacks.onJudgment) {
@@ -1007,22 +1070,32 @@
         this._updateRibbonPositions(this.rushBranchRibbon, songTime, 1);
       }
 
-      // 3. Runner smooth lane dash & running animation
+      // 3. Runner smooth lane dash, elastic squash-stretch stride, slash lunge & neon afterimages
       const laneWidth = 2.15;
       const targetX = (this.currentLane - 1) * laneWidth;
-      this.visualLaneX += (targetX - this.visualLaneX) * Math.min(1, dt * 15);
+      const prevVisualX = this.visualLaneX;
+      this.visualLaneX += (targetX - this.visualLaneX) * Math.min(1, dt * 16);
+      const laneVel = Math.abs(this.visualLaneX - prevVisualX) / Math.max(0.001, dt);
       this.runnerGroup.position.x = this.visualLaneX;
       this.runnerGroup.rotation.z *= Math.pow(0.08, dt);
 
       const stridePhase = songTime * (this.song.bpm / 60) * Math.PI * 2;
-      this.runnerGroup.position.y = 0.05 + Math.abs(Math.sin(stridePhase)) * 0.08;
+      const strideHop = Math.abs(Math.sin(stridePhase));
+      this.runnerGroup.position.y = 0.05 + strideHop * 0.13;
       this.leftLeg.rotation.x = Math.sin(stridePhase) * 0.65;
       this.rightLeg.rotation.x = -Math.sin(stridePhase) * 0.65;
 
       if (this.slashAnimTimer > 0) {
         this.slashAnimTimer = Math.max(0, this.slashAnimTimer - dt);
       }
-      // 5-Pose Multi-Frame State Machine (BPM-synced run1 <-> run2, 160ms slash_l / slash_r / slash_x on hit)
+      if (this.missRecoilTimer > 0) {
+        this.missRecoilTimer = Math.max(0, this.missRecoilTimer - dt);
+      }
+      const slashProg = this.slashAnimTimer > 0 ? (1 - this.slashAnimTimer / 0.16) : 0;
+      const slashPunch = this.slashAnimTimer > 0 ? Math.sin(slashProg * Math.PI) : 0;
+      const recoilRatio = this.missRecoilTimer > 0 ? (this.missRecoilTimer / 0.22) : 0;
+
+      // 5-Pose Multi-Frame State Machine + Elastic Squash-Stretch + Z-Lunge + Miss Recoil
       if (this.runnerSprite && this.runnerSpriteMat && this.runnerPoseTextures) {
         const poseSet = this.runnerPoseTextures[this.charSpec.id] || this.runnerPoseTextures.luna;
         const beatHalf = Math.floor(songTime * (this.song.bpm / 60) * 2) % 2;
@@ -1034,12 +1107,55 @@
           this.runnerSpriteMat.map = poseSet[desiredPose];
           this.runnerSpriteMat.needsUpdate = true;
         }
-        // Subtle bank lean on lane dash only (ZERO artificial PNG slicing or wobbling!)
-        this.runnerSpriteMat.rotation = this.runnerGroup.rotation.z * 0.45;
-        const pulseScale = this.slashAnimTimer > 0 ? 3.52 : 3.35;
-        this.runnerSprite.scale.set(pulseScale, pulseScale, 1);
+        const strideSquash = Math.cos(stridePhase * 2) * 0.055;
+        const baseScale = 3.35 + slashPunch * 0.24;
+        const sx = baseScale * (1 + strideSquash + recoilRatio * 0.09);
+        const sy = baseScale * (1 - strideSquash - recoilRatio * 0.08);
+        this.runnerSprite.scale.set(sx, sy, 1);
+        this.runnerSprite.position.z = -slashPunch * 0.42 + recoilRatio * 0.34;
+        const slashTilt = this.slashAnimTimer > 0
+          ? (this.lastSlashPose === 'slash_l' ? 0.12 : (this.lastSlashPose === 'slash_r' ? -0.12 : 0)) * slashPunch
+          : Math.sin(stridePhase) * 0.032;
+        this.runnerSpriteMat.rotation = this.runnerGroup.rotation.z * 0.5 + slashTilt + recoilRatio * 0.16;
+        if (recoilRatio > 0) {
+          this.runnerSpriteMat.color.setHex(0xff7a90);
+        } else if (this.isFever) {
+          this.runnerSpriteMat.color.setHex(0xfff4cc);
+        } else {
+          this.runnerSpriteMat.color.setHex(0xffffff);
+        }
+
+        // Update 2 Neon Afterimage Ghosts during lane dash, slash, or Fever Overdrive
+        if (this.runnerAfterimages && this.runnerAfterimages.length) {
+          this.afterimageTrail.unshift({
+            x: this.visualLaneX,
+            y: this.runnerGroup.position.y + 1.62,
+            pose: this.currentRunnerPose,
+            rot: this.runnerSpriteMat.rotation
+          });
+          if (this.afterimageTrail.length > 8) this.afterimageTrail.length = 8;
+          const showAfterimage = this.isFever || laneVel > 3.2 || this.slashAnimTimer > 0;
+          const skin = this.saberSkinSpec || SABER_SKINS.neon_plasma;
+          for (let g = 0; g < this.runnerAfterimages.length; g++) {
+            const ghost = this.runnerAfterimages[g];
+            const sample = this.afterimageTrail[Math.min(this.afterimageTrail.length - 1, (g + 1) * 3)];
+            if (sample && showAfterimage) {
+              const gTex = poseSet[sample.pose] || poseSet.run1;
+              if (ghost.mat.map !== gTex) {
+                ghost.mat.map = gTex;
+                ghost.mat.needsUpdate = true;
+              }
+              ghost.sprite.position.set(sample.x, sample.y, 0.65 + (g + 1) * 0.46);
+              ghost.mat.rotation = sample.rot;
+              ghost.mat.color.setHex(this.isFever ? 0xffd84d : (g === 0 ? skin.primary : skin.secondary));
+              ghost.mat.opacity = (this.isFever ? 0.46 : 0.34) * (1 - g * 0.38);
+            } else {
+              ghost.mat.opacity *= Math.pow(0.005, dt);
+            }
+          }
+        }
       }
-      // Animate 3D Crescent Slash Arc VFX (with live rainbow cycling for rainbow_prism skin)
+      // Animate Dual-Layer 3D Crescent Slash Arc VFX (with live rainbow cycling for rainbow_prism skin)
       if (this.slashArcMesh && this.slashArcMat) {
         if (this.saberSkinSpec && this.saberSkinSpec.rainbow) {
           this.slashArcMat.color.setHSL((songTime * 1.4) % 1, 1.0, 0.58);
@@ -1047,26 +1163,29 @@
         }
         if (this.slashAnimTimer > 0) {
           const p = 1 - (this.slashAnimTimer / 0.16);
-          this.slashArcMat.opacity = Math.max(0, (1 - p) * 0.95);
-          this.slashArcMesh.rotation.z += dt * (this.lastSlashPose === 'slash_l' ? -14 : 14);
-          this.slashArcMesh.scale.setScalar(1.0 + p * 0.55);
+          this.slashArcMat.opacity = Math.max(0, (1 - p) * 0.96);
+          if (this.slashCoreMat) this.slashCoreMat.opacity = Math.max(0, (1 - p) * 0.92);
+          this.slashArcMesh.rotation.z += dt * (this.lastSlashPose === 'slash_l' ? -15 : 15);
+          this.slashArcMesh.scale.setScalar(1.0 + p * 0.62);
         } else {
           this.slashArcMat.opacity = 0;
+          if (this.slashCoreMat) this.slashCoreMat.opacity = 0;
         }
       }
 
-      // Subtle dynamic camera follow + micro hit-shake + PERFECT FOV zoom punch (60 -> 57.2 -> 60)
+      // Subtle dynamic camera follow + micro hit-shake + PERFECT FOV zoom punch + Climax Finish Zoom
       let shakeX = 0, shakeY = 0;
       if (this.camShake > 0) {
         this.camShake = Math.max(0, this.camShake - dt);
         shakeX = (Math.random() - 0.5) * 0.22 * (this.camShake / 0.14);
         shakeY = (Math.random() - 0.5) * 0.16 * (this.camShake / 0.14);
       }
+      const inSlowMoClimax = !!(this.chart && this.chart.slowMoStart && songTime >= this.chart.slowMoStart);
       if (this.camera) {
-        let targetFov = this.baseFov || 60;
+        let targetFov = (this.baseFov || 60) - (inSlowMoClimax ? 3.2 : 0);
         if (this.fovPunchTimer > 0) {
           this.fovPunchTimer = Math.max(0, this.fovPunchTimer - dt);
-          targetFov = 60 - 2.8 * Math.sin((this.fovPunchTimer / 0.12) * Math.PI * 0.5);
+          targetFov -= 2.8 * Math.sin((this.fovPunchTimer / 0.12) * Math.PI * 0.5);
         }
         if (Math.abs(this.camera.fov - targetFov) > 0.05) {
           this.camera.fov += (targetFov - this.camera.fov) * Math.min(1, dt * 24);
@@ -1134,7 +1253,13 @@
           mesh.visible = false;
           continue;
         }
-        const passFade = worldZ > 0.25 ? Math.max(0.05, 1.0 - (worldZ - 0.25) / 1.1) : 1.0;
+        // HIDDEN modifier: smoothly shrink & cloak notes as they enter the final 16 units before hit line
+        if (this.hiddenMode && zAhead < 9.5 && worldZ <= 0.1) {
+          mesh.visible = false;
+          continue;
+        }
+        const hiddenScale = (this.hiddenMode && zAhead < 19) ? Math.max(0.15, (zAhead - 9.5) / 9.5) : 1.0;
+        const passFade = (worldZ > 0.25 ? Math.max(0.05, 1.0 - (worldZ - 0.25) / 1.1) : 1.0) * hiddenScale;
 
         mesh.position.set(worldX, worldY, worldZ);
         if (note.type === 'tap') {

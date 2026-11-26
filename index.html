@@ -48,6 +48,9 @@
 
           <div class="login-glass-box">
             <p class="login-caption" data-i18n="tap_to_connect">원터치 소셜 로그인 · 별도 가입 없이 1초 즉시 시작</p>
+            <div style="margin-bottom:10px;">
+              <input id="login-nickname-input" type="text" maxlength="16" placeholder="랭킹에 표시할 닉네임 입력 (선택)" style="width:100%;padding:10px 14px;border-radius:12px;border:1px solid rgba(0,242,255,0.45);background:rgba(6,14,32,0.82);color:#f0f9ff;font-size:13px;font-weight:700;text-align:center;outline:none;box-sizing:border-box;" />
+            </div>
             <!-- Dynamic container sorted automatically by language (KO vs Global) -->
             <div id="social-buttons-list" class="social-buttons-list"></div>
             <div class="login-version-bar">
@@ -191,10 +194,19 @@
               </button>
             </div>
 
-            <div id="w2-modifiers-bar" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px;">
+            <div id="w2-modifiers-bar" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:6px;">
               <button type="button" data-mod="MIRROR" style="padding:6px 4px;border-radius:8px;border:1px solid rgba(0,242,254,0.4);background:rgba(8,20,38,0.85);color:#bae6fd;font-size:11px;font-weight:800;cursor:pointer;">MIRROR +15%</button>
               <button type="button" data-mod="HIDDEN" style="padding:6px 4px;border-radius:8px;border:1px solid rgba(192,132,252,0.4);background:rgba(30,10,48,0.85);color:#f3e8ff;font-size:11px;font-weight:800;cursor:pointer;">HIDDEN +20%</button>
               <button type="button" data-mod="SPEED_125" style="padding:6px 4px;border-radius:8px;border:1px solid rgba(251,191,36,0.4);background:rgba(48,25,8,0.85);color:#fef3c7;font-size:11px;font-weight:800;cursor:pointer;">1.25x +25%</button>
+            </div>
+            <div id="note-speed-control-bar" style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:8px;padding:6px 10px;border-radius:10px;background:rgba(6,16,36,0.82);border:1px solid rgba(56,189,248,0.35);">
+              <span id="lobby-note-speed-readout" style="font-size:11px;font-weight:800;color:#7dd3fc;white-space:nowrap;">⚡ 노트속도 31.0 · 반응 2.6s</span>
+              <div style="display:flex;gap:4px;">
+                <button type="button" class="note-spd-btn" data-spd="0.85" style="padding:3px 7px;border-radius:6px;border:1px solid rgba(148,163,184,0.4);background:rgba(15,23,42,0.85);color:#cbd5e1;font-size:11px;font-weight:800;cursor:pointer;">0.85x</button>
+                <button type="button" class="note-spd-btn active" data-spd="1.0" style="padding:3px 7px;border-radius:6px;border:1px solid rgba(0,242,255,0.8);background:rgba(0,242,255,0.22);color:#ffffff;font-size:11px;font-weight:800;cursor:pointer;">1.0x</button>
+                <button type="button" class="note-spd-btn" data-spd="1.2" style="padding:3px 7px;border-radius:6px;border:1px solid rgba(148,163,184,0.4);background:rgba(15,23,42,0.85);color:#cbd5e1;font-size:11px;font-weight:800;cursor:pointer;">1.2x</button>
+                <button type="button" class="note-spd-btn" data-spd="1.4" style="padding:3px 7px;border-radius:6px;border:1px solid rgba(148,163,184,0.4);background:rgba(15,23,42,0.85);color:#cbd5e1;font-size:11px;font-weight:800;cursor:pointer;">1.4x</button>
+              </div>
             </div>
             <button id="btn-start-run" type="button" class="start-run-neon-btn">
               <span class="start-brackets">»</span>

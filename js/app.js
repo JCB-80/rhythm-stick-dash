@@ -5,6 +5,7 @@
     selectedChar: 'luna',
     selectedSongId: 'seoul_neon_pulse',
     selectedDiff: 'NORMAL',
+    noteSpeedMult: Number(localStorage.getItem('rsd_note_speed_mult') || '1.0') || 1.0,
     game3D: null,
     ghostRivals: [],
     judgeTimer: null,
@@ -246,7 +247,9 @@
     window.AudioEngine.playUiClick();
     $('auth-loading-overlay').classList.remove('hidden');
     try {
-      const user = await window.AuthService.signIn(provider);
+      const nickInput = $('login-nickname-input');
+      const customNick = nickInput ? nickInput.value.trim() : '';
+      const user = await window.AuthService.signIn(provider, customNick);
       window.AuthService.updateUser({ loggedOut: false });
       $('auth-loading-overlay').classList.add('hidden');
 
@@ -382,6 +385,30 @@
       tab.classList.toggle('active', tab.dataset.diff === state.selectedDiff);
     });
 
+    // Live BPM × Difficulty × User Speed Readout
+    const spdReadout = $('lobby-note-speed-readout');
+    if (spdReadout && window.RhythmGame3D && typeof window.RhythmGame3D.computeNoteSpeed === 'function') {
+      const mods = (window.Wave2LiveOps && window.Wave2LiveOps.state.activeModifiers) || {};
+      const sp = window.RhythmGame3D.computeNoteSpeed(curSong, state.selectedDiff, state.noteSpeedMult, !!mods.SPEED_125);
+      spdReadout.textContent = `⚡ 노트속도 ${sp.approachSpeed.toFixed(1)} · 반응 ${sp.reactionSec.toFixed(2)}s`;
+    }
+    document.querySelectorAll('.note-spd-btn').forEach(btn => {
+      const active = Math.abs(Number(btn.dataset.spd) - state.noteSpeedMult) < 0.02;
+      btn.classList.toggle('active', active);
+      btn.style.borderColor = active ? 'rgba(0,242,255,0.85)' : 'rgba(148,163,184,0.4)';
+      btn.style.background = active ? 'rgba(0,242,255,0.24)' : 'rgba(15,23,42,0.85)';
+      btn.style.color = active ? '#ffffff' : '#cbd5e1';
+      if (!btn.dataset.boundSpd) {
+        btn.dataset.boundSpd = '1';
+        btn.addEventListener('click', () => {
+          window.AudioEngine.playUiClick();
+          state.noteSpeedMult = Number(btn.dataset.spd) || 1.0;
+          try { localStorage.setItem('rsd_note_speed_mult', String(state.noteSpeedMult)); } catch {}
+          renderLobby();
+        });
+      }
+    });
+
     // Best Score & Rank Emblem
     const best = window.RankingEngine.getSongBest(curSong.id, state.selectedDiff);
     $('lobby-high-score').textContent = (best.score || 0).toLocaleString();
@@ -445,7 +472,8 @@
         autoFever,
         audioOffset: user?.settings.audioOffset || 0,
         vip: !!user?.vip,
-        saberSkin: user?.equippedSkin || 'neon_plasma'
+        saberSkin: user?.equippedSkin || 'neon_plasma',
+        noteSpeedMult: state.noteSpeedMult
       });
       if (!state.game3D._contextEventsBound) {
         state.game3D._contextEventsBound = true;
