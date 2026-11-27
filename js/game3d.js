@@ -405,7 +405,9 @@
         color: 0x70f8ff, side: THREE.DoubleSide, transparent: true, opacity: 0.28, depthWrite: false
       });
       this.laneSockets = [];
+      this.laneBeams = [];
       this.lanePulse = [0, 0, 0];
+      const beamGeo = new THREE.CylinderGeometry(0.42, 0.72, 11.5, 16, 1, true);
       for (const laneX of [-2.15, 0, 2.15]) {
         const padGroup = new THREE.Group();
         const outer = new THREE.Mesh(outerPadGeo, socketMat);
@@ -420,6 +422,21 @@
         padGroup.position.set(laneX, 0.11, 0);
         this.scene.add(padGroup);
         this.laneSockets.push(padGroup);
+
+        // Beatstar / DJMAX Vertical Neon Light-Beam Pillar on Lane Hit
+        const beamMat = new THREE.MeshBasicMaterial({
+          color: 0x00f2ff,
+          transparent: true,
+          opacity: 0,
+          side: THREE.DoubleSide,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false
+        });
+        const beam = new THREE.Mesh(beamGeo, beamMat);
+        beam.position.set(laneX, 5.8, 0);
+        beam.renderOrder = 5;
+        this.scene.add(beam);
+        this.laneBeams.push(beam);
       }
     }
 
@@ -977,7 +994,7 @@
         this.hp = Math.min(this.charSpec.maxHp, this.hp + this.charSpec.feverHeal);
       }
 
-      window.AudioEngine.playHitSfx(note.type === 'tap' ? 'tap' : 'swipe', this.isFever);
+      window.AudioEngine.playHitSfx(note.type === 'tap' ? 'tap' : 'swipe', this.isFever, this.combo);
       if (window.Haptics) {
         if (this.combo === 10 || this.combo === 25 || this.combo === 50 || this.combo === 100) {
           window.Haptics.trigger('combo');
@@ -1028,20 +1045,48 @@
       this.scene.add(ring);
       this.hitBursts.push(ring);
 
-      // Escalating Beat Saber Split Cube Shatter Debris (2 -> 4 -> 6 pieces with combo) + Camera Shake
+      // Escalating Beat Saber Split Cube Halves + Blinding White Cut-Flash + 10 Radial Neon Sparks!
       this.camShake = isBig ? 0.22 : 0.14;
       const pairs = this.combo >= 25 ? 3 : (this.combo >= 10 ? 2 : 1);
       if (this.sharedDebrisGeo && this.splitDebris) {
+        // 1. White-hot slice flash core at impact point
+        const flashMat = new THREE.MeshBasicMaterial({
+          color: 0xffffff, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false
+        });
+        const flashMesh = new THREE.Mesh(this.sharedTapCoreGeo, flashMat);
+        flashMesh.position.set(x, 0.85, 0);
+        flashMesh.scale.setScalar(isBig ? 2.6 : 1.9);
+        flashMesh.userData = { vx: 0, vy: 0.5, vz: 0, life: 0.14, maxLife: 0.14, isFlash: true };
+        this.scene.add(flashMesh);
+        this.splitDebris.push(flashMesh);
+
+        // 2. Clean 2-Half Sliced Cube Pieces flying left & right
         for (let p = 0; p < pairs; p++) {
           for (const side of [-1, 1]) {
-            const dMat = new THREE.MeshStandardMaterial({ color: hexColor, emissive: hexColor, emissiveIntensity: 0.95, metalness: 0.6, roughness: 0.2, transparent: true, opacity: 0.95 });
+            const dMat = new THREE.MeshStandardMaterial({ color: hexColor, emissive: hexColor, emissiveIntensity: 1.25, metalness: 0.7, roughness: 0.18, transparent: true, opacity: 0.98 });
             const piece = new THREE.Mesh(this.sharedDebrisGeo, dMat);
-            piece.position.set(x + side * (0.28 + p * 0.14), 0.85 + p * 0.18, 0);
-            piece.scale.setScalar(1.0 - p * 0.18);
-            piece.userData = { vx: side * (4.6 + p * 1.4 + Math.random() * 2.4), vy: 4.0 + p * 1.1 + Math.random() * 2.2, vz: 2.5, life: 0.42 };
+            piece.position.set(x + side * (0.28 + p * 0.14), 0.85 + p * 0.16, 0);
+            piece.scale.setScalar(1.05 - p * 0.18);
+            piece.userData = { vx: side * (5.2 + p * 1.6 + Math.random() * 2.2), vy: 4.4 + p * 1.1 + Math.random() * 2.0, vz: 2.2, life: 0.44, maxLife: 0.44 };
             this.scene.add(piece);
             this.splitDebris.push(piece);
           }
+        }
+
+        // 3. Radial Neon Spark Streaks shooting outward
+        const sparkCount = isBig ? 12 : 8;
+        for (let s = 0; s < sparkCount; s++) {
+          const ang = (s / sparkCount) * Math.PI * 2 + Math.random() * 0.3;
+          const spd = 6.5 + Math.random() * 5.5;
+          const spMat = new THREE.MeshBasicMaterial({
+            color: s % 2 === 0 ? 0xffffff : hexColor, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false
+          });
+          const spark = new THREE.Mesh(this.sharedTapCoreGeo, spMat);
+          spark.position.set(x, 0.88, 0);
+          spark.scale.set(0.18, 0.18, 0.75);
+          spark.userData = { vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd + 2.2, vz: (Math.random() - 0.5) * 4, life: 0.30, maxLife: 0.30 };
+          this.scene.add(spark);
+          this.splitDebris.push(spark);
         }
       }
     }
@@ -1380,8 +1425,13 @@
             this.lanePulse[i] = Math.max(0, this.lanePulse[i] - dt * 6.5);
           }
           const p = this.lanePulse ? this.lanePulse[i] : 0;
-          const sc = 1 + 0.35 * p;
+          const sc = 1 + 0.38 * p;
           this.laneSockets[i].scale.set(sc, sc, 1);
+          if (this.laneBeams && this.laneBeams[i]) {
+            this.laneBeams[i].material.opacity = p * 0.48;
+            this.laneBeams[i].material.color.setHex(this.isFever ? 0xffd84d : (this.saberSkinSpec ? this.saberSkinSpec.primary : 0x00f2ff));
+            this.laneBeams[i].scale.set(1 + (1 - p) * 0.45, 1, 1 + (1 - p) * 0.45);
+          }
         }
       }
 

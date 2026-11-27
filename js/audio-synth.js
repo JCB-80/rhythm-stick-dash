@@ -522,17 +522,21 @@
       return customSong;
     }
 
-    // ==================== BPM-SYNCED BEATMAP + 8-BEAT RUSH BARRAGE + SLOW-MO FINISH ====================
+    // ==================== REAL AUDIO-SYNCED BEATMAP + 8-BEAT RUSH BARRAGE ====================
     generateChart(song, difficulty) {
       const rand = seededRandom(song.title.length * 997 + difficulty.charCodeAt(0) * 131 + Math.round(song.bpm));
-      const beatSec = 60 / song.bpm;
+      const realMap = (!song.isCustom && window.SONG_BEATMAPS) ? window.SONG_BEATMAPS[song.id] : null;
+      const effectiveBpm = (realMap && realMap.bpm) ? realMap.bpm : song.bpm;
+      const beatSec = 60 / effectiveBpm;
       const branchStart = Math.min(24, song.duration * 0.34);
       const branchDecision = branchStart + 3.2;
       const branchEnd = Math.min(song.duration - 12, branchDecision + 18);
       const hasBranch = difficulty !== 'EASY' && song.duration >= 36 && branchEnd > branchDecision + 4;
 
-      // Highlight Drop 8-beat RUSH BARRAGE window (synced to bar 16 drop!)
-      const rushStart = Math.min(song.duration - 8, Math.max(beatSec * 32, song.duration * 0.52));
+      // Highlight Drop 8-beat RUSH BARRAGE window synced to the track's REAL loudest energy drop!
+      const rushStart = (realMap && realMap.dropStart)
+        ? realMap.dropStart
+        : Math.min(song.duration - 8, Math.max(beatSec * 32, song.duration * 0.52));
       const rushEnd = Math.min(song.duration - 4, rushStart + beatSec * 8);
       const slowMoStart = Math.max(0, song.duration - 2.6);
 
@@ -561,6 +565,81 @@
             isRushBarrage: t >= rushStart && t <= rushEnd,
             hit: false
           });
+        });
+      } else if (realMap && Array.isArray(realMap.beats) && realMap.beats.length > 16) {
+        // EXACT REAL AUDIO KICK/SNARE ONSET-SYNCED BEATMAP!
+        // Each entry: [timeSec, isMainBeat (1/0), onsetStrength (0..1.5), energy (0..1)]
+        let lastNoteTime = -99;
+        const minGap = difficulty === 'EASY' ? beatSec * 0.85 : (difficulty === 'NORMAL' ? beatSec * 0.45 : beatSec * 0.28);
+
+        realMap.beats.forEach((ev, stepIdx) => {
+          const t = ev[0];
+          const onMainBeat = ev[1] === 1;
+          const onset = ev[2];
+          const energy = ev[3];
+
+          if (hasBranch && Math.abs(t - branchDecision) < 0.65) return;
+          if (t - lastNoteTime < minGap) return;
+
+          const inRushBarrage = (t >= rushStart && t <= rushEnd);
+          let shouldPlace = false;
+          if (inRushBarrage) {
+            shouldPlace = (difficulty === 'EASY') ? onMainBeat : (onMainBeat || onset >= 0.45);
+          } else if (difficulty === 'EASY') {
+            // Land cleanly on real main beats (skip quiet intro bars with very low energy/onset)
+            shouldPlace = onMainBeat && (energy >= 0.22 || onset >= 0.55) && (stepIdx % 16 !== 14);
+          } else if (difficulty === 'NORMAL') {
+            // Real main beats + strong off-beat snare/synth hits during energetic sections
+            shouldPlace = onMainBeat || (onset >= 0.72 && energy >= 0.45);
+          } else if (difficulty === 'HARD') {
+            shouldPlace = onMainBeat || (onset >= 0.48 && energy >= 0.35);
+          } else {
+            // EXTREME: dense musical stream following real drum & synth transients
+            shouldPlace = onMainBeat || onset >= 0.30 || energy >= 0.55;
+          }
+
+          if (!shouldPlace) return;
+          lastNoteTime = t;
+
+          if (inRushBarrage) {
+            currentLane = (stepIdx % 3);
+          } else if (onset >= 0.85 || rand() < (difficulty === 'EASY' ? 0.38 : 0.58)) {
+            const delta = rand() < 0.5 ? -1 : 1;
+            currentLane = Math.max(0, Math.min(2, currentLane + delta));
+          }
+
+          // Place directional Swipe notes on big musical accents (high onset strength on main beats!)
+          let type = 'tap';
+          const isBigAccent = onMainBeat && onset >= 0.92;
+          const swipeChance = difficulty === 'EASY' ? 0.08 : (difficulty === 'NORMAL' ? 0.22 : (difficulty === 'HARD' ? 0.32 : 0.38));
+          if (inRushBarrage && onMainBeat && stepIdx % 4 === 0 && difficulty !== 'EASY') {
+            type = (stepIdx % 8 === 0) ? 'swipeL' : 'swipeR';
+          } else if ((isBigAccent && rand() < swipeChance * 1.45) || (onMainBeat && rand() < swipeChance * 0.65)) {
+            type = (currentLane === 0) ? 'swipeR' : (currentLane === 2 ? 'swipeL' : (rand() < 0.5 ? 'swipeL' : 'swipeR'));
+          }
+
+          const inBranch = hasBranch && t > branchDecision && t < branchEnd;
+          notes.push({
+            id: 0,
+            time: Number(t.toFixed(3)),
+            lane: currentLane,
+            type,
+            branch: inBranch ? 'both' : 'main',
+            isRushBarrage: inRushBarrage,
+            hit: false
+          });
+
+          if (inBranch && onMainBeat && difficulty !== 'EASY' && !inRushBarrage && energy >= 0.4) {
+            notes.push({
+              id: 0,
+              time: Number((t + beatSec * 0.5).toFixed(3)),
+              lane: (currentLane + 1) % 3,
+              type: 'tap',
+              branch: 'rush_only',
+              isRushBarrage: false,
+              hit: false
+            });
+          }
         });
       } else {
         const stepDiv = (difficulty === 'EASY') ? 1 : 2;
@@ -655,31 +734,68 @@
       };
     }
 
-    // ==================== TACTILE GAMEPLAY & UI SFX ====================
-    playHitSfx(type = 'tap', isFever = false) {
+    // ==================== TACTILE BEAT SABER LAYERED HIT & SLICE SFX ====================
+    playHitSfx(type = 'tap', isFever = false, combo = 0) {
       try {
         this.ensureContext();
         const now = this.ctx.currentTime;
+
+        // Layer 1: Punchy Sub-Thump Kick Impact (145Hz -> 48Hz in 48ms)
+        const sub = this.ctx.createOscillator();
+        const subGain = this.ctx.createGain();
+        sub.type = 'sine';
+        sub.frequency.setValueAtTime(type === 'tap' ? 148 : 175, now);
+        sub.frequency.exponentialRampToValueAtTime(46, now + 0.052);
+        subGain.gain.setValueAtTime(0.32, now);
+        subGain.gain.exponentialRampToValueAtTime(0.001, now + 0.065);
+        sub.connect(subGain);
+        subGain.connect(this.sfxGain);
+        this._trackVoice(sub, this.sfxGain, [subGain]);
+        sub.start(now);
+        sub.stop(now + 0.07);
+
+        // Layer 2: Crisp Plasma Saber Slice Noise Burst (filtered high-frequency snap)
+        const nLen = Math.floor(this.ctx.sampleRate * (type === 'tap' ? 0.045 : 0.085));
+        const nBuf = this.ctx.createBuffer(1, nLen, this.ctx.sampleRate);
+        const data = nBuf.getChannelData(0);
+        for (let i = 0; i < nLen; i++) {
+          data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / nLen, 1.8);
+        }
+        const noise = this.ctx.createBufferSource();
+        noise.buffer = nBuf;
+        const hp = this.ctx.createBiquadFilter();
+        hp.type = 'bandpass';
+        hp.frequency.setValueAtTime(type === 'tap' ? 2800 : 4200, now);
+        hp.Q.setValueAtTime(1.4, now);
+        const nGain = this.ctx.createGain();
+        nGain.gain.setValueAtTime(type === 'tap' ? 0.22 : 0.30, now);
+        nGain.gain.exponentialRampToValueAtTime(0.001, now + (type === 'tap' ? 0.045 : 0.085));
+        noise.connect(hp);
+        hp.connect(nGain);
+        nGain.connect(this.sfxGain);
+        this._trackVoice(noise, this.sfxGain, [hp, nGain]);
+        noise.start(now);
+
+        // Layer 3: Sparkling Harmonic Chime (subtle pitch lift with combo & Fever)
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
-
+        const comboPitch = 1 + Math.min(combo || 0, 40) * 0.004;
         if (type === 'tap') {
           osc.type = 'triangle';
-          osc.frequency.setValueAtTime(isFever ? 987.77 : 783.99, now);
-          osc.frequency.exponentialRampToValueAtTime(isFever ? 1567.98 : 1174.66, now + 0.065);
+          osc.frequency.setValueAtTime((isFever ? 1046.5 : 880) * comboPitch, now);
+          osc.frequency.exponentialRampToValueAtTime((isFever ? 1567.98 : 1318.5) * comboPitch, now + 0.06);
         } else {
           osc.type = 'sawtooth';
-          osc.frequency.setValueAtTime(587.33, now);
-          osc.frequency.exponentialRampToValueAtTime(1760, now + 0.11);
+          osc.frequency.setValueAtTime(659.25 * comboPitch, now);
+          osc.frequency.exponentialRampToValueAtTime(1975.5 * comboPitch, now + 0.095);
         }
-
-        gain.gain.setValueAtTime(0.24, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.11);
+        gain.gain.setValueAtTime(0.16, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.095);
         osc.connect(gain);
         gain.connect(this.sfxGain);
         this._trackVoice(osc, this.sfxGain, [gain]);
         osc.start(now);
-        osc.stop(now + 0.12);
+        osc.stop(now + 0.105);
       } catch (_) {}
     }
 
