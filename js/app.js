@@ -516,10 +516,20 @@
     rightEl.innerHTML = state.ghostRivals.slice(2, 4).map(renderCard).join('');
   }
 
-  // Global Safe Haptics Engine (Top-Grossing Tactile Feedback)
+  // Global Safe Haptics Engine (Crisp Light Box-Break Vibration on Android Native + Mobile Web)
   const HAPTIC_PATTERNS = {
-    light: 10, tap: 12, medium: 22, swipe: 22, heavy: 40,
-    combo: [18, 25, 38], fever: [30, 25, 65], jackpot: [25, 25, 45, 25, 70], miss: 45
+    light: 10,
+    tap: 14,          // Light, crisp tactile tick on every box break
+    medium: 22,
+    swipe: 24,        // Slightly stronger crisp slice tick on directional swipe
+    heavy: 36,
+    combo: [14, 24, 24],
+    fever: [22, 24, 48],
+    jackpot: [18, 22, 32, 22, 48],
+    miss: 32
+  };
+  const HAPTIC_AMPLITUDES = {
+    light: 50, tap: 65, medium: 95, swipe: 105, heavy: 140, combo: 115, fever: 165, jackpot: 165, miss: 85
   };
   let _hapticOn = true;
   try { _hapticOn = localStorage.getItem('rsd_haptic_enabled') !== '0'; } catch {}
@@ -531,9 +541,16 @@
     },
     trigger(type) {
       if (!_hapticOn) return;
+      const pattern = HAPTIC_PATTERNS[type] || 14;
+      const amp = HAPTIC_AMPLITUDES[type] || 65;
       try {
+        if (window.AndroidHaptics && typeof window.AndroidHaptics.vibrate === 'function') {
+          const ms = Array.isArray(pattern) ? pattern[0] : pattern;
+          window.AndroidHaptics.vibrate(ms, amp);
+          return;
+        }
         if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
-          navigator.vibrate(HAPTIC_PATTERNS[type] || 12);
+          navigator.vibrate(pattern);
         }
       } catch {}
     }
