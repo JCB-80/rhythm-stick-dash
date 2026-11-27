@@ -477,16 +477,41 @@
           slash_x: loader.load(`./assets/characters/runner_${cid}_slash_x.png`)
         };
       }
-      // 8-Frame (4x2) Smooth Sprite Sheets for Flagship Runner Luna (12-16 FPS seamless animation)
-      const loadSheetTex = (url) => {
-        const t = loader.load(url);
-        t.repeat.set(0.25, 0.5);
-        t.offset.set(0, 0.5);
-        return t;
+      // 8-Frame (4x2) Discrete CanvasTexture Slicer (100% guaranteed frame-by-frame animation in Three.js r128!)
+      const sliceSheetToFrames = (url, cols = 4, rows = 2) => {
+        const frames = [];
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+          const cw = Math.floor(img.naturalWidth / cols);
+          const ch = Math.floor(img.naturalHeight / rows);
+          for (let i = 0; i < cols * rows; i++) {
+            const c = document.createElement('canvas');
+            c.width = cw;
+            c.height = ch;
+            const g = c.getContext('2d');
+            g.drawImage(img, (i % cols) * cw, Math.floor(i / cols) * ch, cw, ch, 0, 0, cw, ch);
+            const tex = new THREE.CanvasTexture(c);
+            tex.needsUpdate = true;
+            frames[i] = tex;
+          }
+        };
+        img.src = url;
+        return frames;
       };
-      this.lunaSheets = {
-        run:   loadSheetTex('./assets/characters/runner_luna_run_sheet.png?v=2'),
-        slash: loadSheetTex('./assets/characters/runner_luna_slash_sheet.png?v=2')
+      this.runnerSheetFrames = {
+        luna: {
+          run:   sliceSheetToFrames('./assets/characters/runner_luna_run_sheet.png?v=6'),
+          slash: sliceSheetToFrames('./assets/characters/runner_luna_slash_sheet.png?v=6')
+        },
+        kai: {
+          run:   sliceSheetToFrames('./assets/characters/runner_kai_run_sheet.png?v=6'),
+          slash: sliceSheetToFrames('./assets/characters/runner_kai_slash_sheet.png?v=6')
+        },
+        aria: {
+          run:   sliceSheetToFrames('./assets/characters/runner_aria_run_sheet.png?v=6'),
+          slash: sliceSheetToFrames('./assets/characters/runner_aria_slash_sheet.png?v=6')
+        }
       };
       this.currentRunnerPose = 'run1';
       this.lastSlashPose = 'slash_l';
@@ -701,8 +726,9 @@
       if (this.runnerHoverMat) this.runnerHoverMat.color.setHex(activeStickHex);
       this.currentRunnerPose = 'run1';
       if (this.runnerSpriteMat && this.runnerPoseTextures) {
-        if (this.charSpec.id === 'luna' && this.lunaSheets && this.lunaSheets.run) {
-          this.runnerSpriteMat.map = this.lunaSheets.run;
+        const sf = this.runnerSheetFrames && this.runnerSheetFrames[this.charSpec.id];
+        if (sf && sf.run && sf.run.length === 8) {
+          this.runnerSpriteMat.map = sf.run[0];
         } else {
           const set = this.runnerPoseTextures[this.charSpec.id] || this.runnerPoseTextures.luna;
           this.runnerSpriteMat.map = set.run1;
@@ -1109,25 +1135,27 @@
       const slashPunch = this.slashAnimTimer > 0 ? Math.sin(slashProg * Math.PI) : 0;
       const recoilRatio = this.missRecoilTimer > 0 ? (this.missRecoilTimer / 0.22) : 0;
 
-      // 8-Frame (4x2) Smooth Sprite-Sheet State Machine for Luna + 5-Pose Fallback for Kai/Aria
+      // 8-Frame (4x2) Discrete-Frame Running & Slashing State Machine (ZERO Three.js UV bugs, ZERO head wobble!)
       if (this.runnerSprite && this.runnerSpriteMat && this.runnerPoseTextures) {
         const poseSet = this.runnerPoseTextures[this.charSpec.id] || this.runnerPoseTextures.luna;
-        const useLunaSheet = this.charSpec.id === 'luna' && this.lunaSheets && this.lunaSheets.run;
-        if (useLunaSheet) {
-          const isSlashing = this.slashAnimTimer > 0;
-          const sheetTex = isSlashing ? this.lunaSheets.slash : this.lunaSheets.run;
+        const sf = this.runnerSheetFrames && this.runnerSheetFrames[this.charSpec.id];
+        const hasRunFrames = sf && sf.run && sf.run.length === 8;
+        const hasSlashFrames = sf && sf.slash && sf.slash.length === 8;
+        if (hasRunFrames) {
+          const isSlashing = this.slashAnimTimer > 0 && hasSlashFrames;
+          const activeFrames = isSlashing ? sf.slash : sf.run;
           const frameIdx = isSlashing
             ? Math.min(7, Math.floor(slashProg * 8))
-            : Math.floor(songTime * (this.song.bpm / 60) * 6) % 8;
-          const col = frameIdx % 4;
-          const row = Math.floor(frameIdx / 4);
-          sheetTex.repeat.set(0.25, 0.5);
-          sheetTex.offset.set(col * 0.25, (1 - row) * 0.5);
-          if (this.runnerSpriteMat.map !== sheetTex) {
-            this.runnerSpriteMat.map = sheetTex;
+            : Math.floor(songTime * (this.song.bpm / 60) * 4) % 8;
+          const nextTex = activeFrames[frameIdx];
+          if (nextTex && this.runnerSpriteMat.map !== nextTex) {
+            this.runnerSpriteMat.map = nextTex;
             this.runnerSpriteMat.needsUpdate = true;
           }
-          this.currentRunnerPose = isSlashing ? 'slash_x' : 'run1';
+          // Natural foot-synced vertical stride arc (planted -> push-off -> airborne -> plant)
+          const strideLiftTable = [0.12, 0.06, 0.02, 0.0, 0.12, 0.06, 0.02, 0.0];
+          this.runnerGroup.position.y = 0.04 + (isSlashing ? 0.04 : strideLiftTable[frameIdx]);
+          this.currentRunnerPose = isSlashing ? 'slash_x' : `run_${frameIdx}`;
         } else {
           const beatHalf = Math.floor(songTime * (this.song.bpm / 60) * 2) % 2;
           const desiredPose = this.slashAnimTimer > 0
